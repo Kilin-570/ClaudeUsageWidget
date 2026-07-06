@@ -7,6 +7,12 @@ using System.Text.Json;
 
 namespace ClaudeUsageWidget;
 
+/// <summary>Thrown on HTTP 429 from the usage endpoint — transient, retry later.</summary>
+public class RateLimitedException(TimeSpan? retryAfter) : Exception("usage API 頻率受限 (429)")
+{
+    public TimeSpan? RetryAfter { get; } = retryAfter;
+}
+
 /// <summary>
 /// OAuth PKCE client against Anthropic's Claude-account OAuth (the same flow Claude Code's
 /// /login uses), plus the usage endpoint that backs the /usage screen.
@@ -194,6 +200,9 @@ public class AnthropicOAuth
         var body = await resp.Content.ReadAsStringAsync();
         if (resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden)
             throw new UnauthorizedAccessException($"usage API 授權失敗 ({(int)resp.StatusCode})");
+        if ((int)resp.StatusCode == 429)
+            throw new RateLimitedException(resp.Headers.RetryAfter?.Delta
+                ?? (resp.Headers.RetryAfter?.Date is DateTimeOffset d ? d - DateTimeOffset.UtcNow : null));
         if (!resp.IsSuccessStatusCode)
             throw new InvalidOperationException($"usage API 失敗 ({(int)resp.StatusCode}): {Truncate(body)}");
         return UsageParser.Parse(body);

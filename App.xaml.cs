@@ -153,6 +153,9 @@ public partial class App : System.Windows.Application
 
     // ---------- Data flow ----------
 
+    const int BaseIntervalSec = 60;
+    int _backoffSec = BaseIntervalSec;
+
     async Task FetchAndRenderAsync()
     {
         if (!_service.HasTokens) return;
@@ -162,6 +165,22 @@ public partial class App : System.Windows.Application
             var buckets = await _service.GetUsageAsync();
             _widget.ShowUsage(buckets);
             UpdateTray(buckets);
+            if (_backoffSec != BaseIntervalSec)
+            {
+                _backoffSec = BaseIntervalSec;
+                _fetchTimer.Interval = TimeSpan.FromSeconds(BaseIntervalSec);
+            }
+        }
+        catch (RateLimitedException ex)
+        {
+            // Transient 429: back off quietly and keep showing the last data.
+            _backoffSec = Math.Min(600, _backoffSec * 2);
+            var waitSec = ex.RetryAfter?.TotalSeconds is double ra && ra > 0
+                ? Math.Clamp(ra, BaseIntervalSec, 600)
+                : _backoffSec;
+            _fetchTimer.Interval = TimeSpan.FromSeconds(waitSec);
+            Log.Write($"usage API 限流 (429)，{waitSec:F0} 秒後重試");
+            _widget.ShowNotice($"{DateTime.Now.AddSeconds(waitSec):HH:mm} 重試");
         }
         catch (UnauthorizedAccessException ex)
         {

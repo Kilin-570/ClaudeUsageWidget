@@ -72,6 +72,13 @@ public partial class MainWindow : Window
         StatusText.Text = "";
     }
 
+    /// <summary>Quiet corner note (e.g. transient rate limit) — keeps showing the last data.</summary>
+    public void ShowNotice(string message)
+    {
+        ErrorText.Visibility = Visibility.Collapsed;
+        StatusText.Text = message;
+    }
+
     public void ShowUsage(List<UsageBucket> buckets)
     {
         _lastBuckets = buckets;

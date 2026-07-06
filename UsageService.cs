@@ -85,6 +85,12 @@ public class UsageService
             SetTokens(fresh);
             return fresh;
         }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException)
+        {
+            // Network hiccup — not an auth failure; surface as a transient error instead
+            // of demanding a re-login.
+            throw new InvalidOperationException($"網路暫時無法連線（{ex.Message}）", ex);
+        }
         catch (Exception ex) when (ex is not UnauthorizedAccessException)
         {
             throw new UnauthorizedAccessException($"Token 刷新失敗，請重新登入（{ex.Message}）");
