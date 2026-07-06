@@ -44,6 +44,23 @@ dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true 
 .\dist\ClaudeUsageWidget.exe
 ```
 
+### Upgrading from an older version / 從舊版升級
+
+Since v1.4.0 the app updates itself (right-click → **Check for updates**). If you're on an older version, upgrade once manually:
+
+1. Right-click the tray icon → **Exit / 結束**
+2. Download the latest zip and overwrite your old `ClaudeUsageWidget.exe` with the new one
+3. Run it — your sign-in, settings and auto-start are all kept (they live in `%APPDATA%\ClaudeUsageWidget`, not next to the exe)
+
+從 v1.4.0 起內建自動更新（右鍵 →「檢查更新」）。更舊的版本請手動升級一次：結束程式 → 用新 exe 覆蓋舊 exe → 重新執行即可，登入與設定都會保留。
+
+### Uninstall / 完整移除
+
+1. Right-click the tray icon → **Exit / 結束**, then delete `ClaudeUsageWidget.exe`
+2. Delete `%APPDATA%\ClaudeUsageWidget\` (encrypted tokens & settings)
+3. Delete the `ClaudeUsageWidget` shortcut in `shell:startup` if present
+4. Optionally revoke the app's access in your Claude account settings
+
 ## Privacy & security / 隱私與安全
 
 - Your OAuth tokens are stored **only on your PC**, encrypted with Windows DPAPI (only your Windows account can decrypt them): `%APPDATA%\ClaudeUsageWidget\tokens.dat`
