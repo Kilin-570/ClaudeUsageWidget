@@ -5,9 +5,8 @@
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
         Background="#FF1E1E28">
     <StackPanel Margin="24,20">
-        <TextBlock Text="連結你的 Claude 帳號" Foreground="White" FontSize="17" FontWeight="SemiBold"/>
-        <TextBlock Margin="0,8,0,0" Foreground="#FFB8B8C2" FontSize="12" TextWrapping="Wrap"
-                   Text="這個工具需要讀取你的 Claude 方案使用量。按下方按鈕會開啟瀏覽器，用你的 Claude 帳號登入並授權（和 Claude Code 的 /login 是同一套流程）。授權後 token 只會加密儲存在這台電腦上。"/>
+        <TextBlock x:Name="HeadingText" Text="連結你的 Claude 帳號" Foreground="White" FontSize="17" FontWeight="SemiBold"/>
+        <TextBlock x:Name="BodyText" Margin="0,8,0,0" Foreground="#FFB8B8C2" FontSize="12" TextWrapping="Wrap"/>
 
         <Button x:Name="BrowserLoginButton" Content="開啟瀏覽器登入" Margin="0,16,0,0" Padding="0,10"
                 FontSize="14" Background="#FFCC7A5C" Foreground="White" BorderThickness="0"
@@ -16,11 +15,10 @@
         <TextBlock x:Name="StatusText" Margin="0,10,0,0" Foreground="#FF8FD08F" FontSize="12"
                    TextWrapping="Wrap" Visibility="Collapsed"/>
 
-        <Expander Header="瀏覽器沒有自動完成？改用手動貼上" Margin="0,16,0,0"
+        <Expander x:Name="ManualExpander" Header="瀏覽器沒有自動完成？改用手動貼上" Margin="0,16,0,0"
                   Foreground="#FF9A9AA6" FontSize="12">
             <StackPanel Margin="0,8,0,0">
-                <TextBlock Foreground="#FFB8B8C2" FontSize="11" TextWrapping="Wrap"
-                           Text="1. 按下面按鈕開啟登入頁（授權後頁面會顯示一段代碼）&#10;2. 複製整段代碼貼到下方，按「完成登入」"/>
+                <TextBlock x:Name="ManualStepsText" Foreground="#FFB8B8C2" FontSize="11" TextWrapping="Wrap"/>
                 <Button x:Name="ManualOpenButton" Content="開啟登入頁面（手動模式）" Margin="0,8,0,0" Padding="0,6"
                         Click="OnManualOpenClick"/>
                 <TextBox x:Name="CodeBox" Margin="0,8,0,0" Padding="6" FontFamily="Consolas"

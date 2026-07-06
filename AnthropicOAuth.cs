@@ -74,7 +74,7 @@ public class AnthropicOAuth
         {
             OpenBrowser(BuildAuthorizeUrl(LocalRedirectUri));
             var (code, state) = await WaitForCallbackAsync(listener, ct);
-            if (state != _state) throw new InvalidOperationException("OAuth state 不符，已中止。");
+            if (state != _state) throw new InvalidOperationException(L10n.T("oauth_state_mismatch"));
             return await ExchangeCodeAsync(code, _state, LocalRedirectUri);
         }
         finally
@@ -94,7 +94,7 @@ public class AnthropicOAuth
     public async Task<StoredTokens> LoginViaPastedCodeAsync(string pasted)
     {
         if (string.IsNullOrEmpty(_verifier))
-            throw new InvalidOperationException("請先按「開啟登入頁面」再貼上代碼。");
+            throw new InvalidOperationException(L10n.T("oauth_click_open_first"));
         var parts = pasted.Trim().Split('#');
         var code = parts[0].Trim();
         var state = parts.Length > 1 ? parts[1].Trim() : _state;
@@ -129,8 +129,8 @@ public class AnthropicOAuth
 
             var ok = !string.IsNullOrEmpty(code);
             var html = ok
-                ? "<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'><h2>✅ 登入成功</h2><p>可以關閉這個分頁，回到 Claude Usage Widget。</p></body></html>"
-                : "<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'><h2>❌ 未收到授權碼</h2><p>請回到工具重試。</p></body></html>";
+                ? $"<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'><h2>✅ {L10n.T("browser_success")}</h2><p>{L10n.T("browser_success_body")}</p></body></html>"
+                : $"<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'><h2>❌ {L10n.T("browser_no_code")}</h2><p>{L10n.T("browser_no_code_body")}</p></body></html>";
             var body = Encoding.UTF8.GetBytes(html);
             var header = Encoding.ASCII.GetBytes(
                 $"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n");

@@ -8,10 +8,11 @@ A tiny Windows desktop widget that shows your **Claude plan usage in real time**
 
 ## Features / 功能
 
-- 🪟 **Floating widget** — semi-transparent, always-on-top, draggable, remembers position
+- 🪟 **Floating widget** — always-on-top, draggable, remembers position
 - 🔔 **Tray icon** — live percentage ring drawn into the icon; hover for details, left-click to show/hide
-- 🔄 **Auto refresh** every 60 seconds; colors shift orange at 70% and red at 90%
+- 🔄 **Auto refresh** (60 s / 90 s / 2 min / 5 min, default 90 s); colors shift orange at 70% and red at 90%
 - ⏰ **Reset countdown** for each limit (e.g. "resets in 2 hr 38 min")
+- ⚙️ **Settings** — language (English / 繁體中文), dark / light theme, background transparency 0–100%
 - 🚀 **Start with Windows** (optional, on by default, toggle in right-click menu)
 - 🔐 **Sign in once** — browser OAuth (the same flow Claude Code's `/login` uses); tokens are encrypted with Windows DPAPI and stored only on your machine
 

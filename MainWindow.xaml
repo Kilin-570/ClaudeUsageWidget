@@ -8,23 +8,24 @@
         MouseLeftButtonDown="OnDragMove">
     <Window.ContextMenu>
         <ContextMenu>
-            <MenuItem Header="立即更新" Click="OnRefreshClick"/>
-            <MenuItem Header="隱藏小工具" Click="OnHideClick"/>
+            <MenuItem x:Name="RefreshMenuItem" Header="立即更新" Click="OnRefreshClick"/>
+            <MenuItem x:Name="HideMenuItem" Header="隱藏小工具" Click="OnHideClick"/>
             <Separator/>
+            <MenuItem x:Name="SettingsMenuItem" Header="設定…" Click="OnSettingsClick"/>
             <MenuItem x:Name="AutoStartMenuItem" Header="開機自動啟動" IsCheckable="True" Click="OnAutoStartToggle"/>
-            <MenuItem Header="重新登入" Click="OnReloginClick"/>
+            <MenuItem x:Name="ReloginMenuItem" Header="重新登入" Click="OnReloginClick"/>
             <Separator/>
-            <MenuItem Header="結束" Click="OnExitClick"/>
+            <MenuItem x:Name="ExitMenuItem" Header="結束" Click="OnExitClick"/>
         </ContextMenu>
     </Window.ContextMenu>
 
-    <Border CornerRadius="10" Background="#E6191922" Padding="12,10" MinWidth="215">
+    <Border x:Name="RootBorder" CornerRadius="10" Background="#E6191922" Padding="12,10" MinWidth="215">
         <Border.Effect>
             <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.5"/>
         </Border.Effect>
         <StackPanel>
             <DockPanel Margin="0,0,0,6">
-                <TextBlock Text="Claude 用量" Foreground="#FFDDDDE4" FontSize="12" FontWeight="SemiBold"/>
+                <TextBlock x:Name="TitleText" Text="Claude 用量" Foreground="#FFDDDDE4" FontSize="12" FontWeight="SemiBold"/>
                 <TextBlock x:Name="StatusText" Text="" Foreground="#FF8A8A96" FontSize="10"
                            HorizontalAlignment="Right" VerticalAlignment="Center"/>
             </DockPanel>

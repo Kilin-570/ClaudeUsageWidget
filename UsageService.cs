@@ -48,7 +48,7 @@ public class UsageService
         await _gate.WaitAsync();
         try
         {
-            var tokens = Tokens ?? throw new UnauthorizedAccessException("尚未登入");
+            var tokens = Tokens ?? throw new UnauthorizedAccessException(L10n.T("err_not_signed_in"));
 
             if (tokens.ExpiresAt <= DateTimeOffset.UtcNow.AddMinutes(2))
                 tokens = await RefreshOrThrowAsync(tokens);
@@ -75,7 +75,7 @@ public class UsageService
         if (string.IsNullOrEmpty(current.RefreshToken))
         {
             ClearTokens();
-            throw new UnauthorizedAccessException("Token 已過期，請重新登入");
+            throw new UnauthorizedAccessException(L10n.T("err_token_expired"));
         }
         try
         {
@@ -89,11 +89,11 @@ public class UsageService
         {
             // Network hiccup — not an auth failure; surface as a transient error instead
             // of demanding a re-login.
-            throw new InvalidOperationException($"網路暫時無法連線（{ex.Message}）", ex);
+            throw new InvalidOperationException(L10n.F("err_network", ex.Message), ex);
         }
         catch (Exception ex) when (ex is not UnauthorizedAccessException)
         {
-            throw new UnauthorizedAccessException($"Token 刷新失敗，請重新登入（{ex.Message}）");
+            throw new UnauthorizedAccessException(L10n.F("err_refresh_failed", ex.Message));
         }
     }
 }

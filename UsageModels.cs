@@ -121,11 +121,11 @@ public static class UsageParser
     public static string FormatCountdown(DateTimeOffset resetsAt)
     {
         var remaining = resetsAt - DateTimeOffset.Now;
-        if (remaining <= TimeSpan.Zero) return "即將重置";
+        if (remaining <= TimeSpan.Zero) return L10n.T("reset_soon");
         if (remaining.TotalHours >= 24)
-            return $"{(int)remaining.TotalDays} 天 {remaining.Hours} 時後重置";
+            return L10n.F("reset_days", (int)remaining.TotalDays, remaining.Hours);
         if (remaining.TotalHours >= 1)
-            return $"{(int)remaining.TotalHours} 時 {remaining.Minutes} 分後重置";
-        return $"{Math.Max(1, remaining.Minutes)} 分後重置";
+            return L10n.F("reset_hours", (int)remaining.TotalHours, remaining.Minutes);
+        return L10n.F("reset_mins", Math.Max(1, remaining.Minutes));
     }
 }

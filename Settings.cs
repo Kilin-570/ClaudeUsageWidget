@@ -10,6 +10,10 @@ public class Settings
     public double? WindowTop { get; set; }
     public bool WidgetVisible { get; set; } = true;
     public bool FirstRunDone { get; set; }
+    public string? Language { get; set; }            // "zh" | "en" | null = follow system
+    public string Theme { get; set; } = "dark";      // "dark" | "light"
+    public int BgTransparency { get; set; } = 10;    // 0 = solid, 100 = fully transparent
+    public int RefreshIntervalSec { get; set; } = 90;
 
     static string Dir => AppPaths.DataDir;
     static string FilePath => Path.Combine(Dir, "settings.json");

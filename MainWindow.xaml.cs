@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     public event Action? ReloginRequested;
     public event Action? HideRequested;
     public event Action? ExitRequested;
+    public event Action? SettingsRequested;
 
     public MainWindow(Settings settings)
     {
@@ -37,6 +38,10 @@ public partial class MainWindow : Window
             Top = area.Top + 16;
         }
 
+        ApplyAppearance();
+        L10n.Changed += ApplyAppearance;
+        ThemeManager.Changed += ApplyAppearance;
+
         Loaded += (_, _) => AutoStartMenuItem.IsChecked = AutoStart.IsEnabled();
     }
 
@@ -53,6 +58,7 @@ public partial class MainWindow : Window
     void OnHideClick(object sender, RoutedEventArgs e) => HideRequested?.Invoke();
     void OnReloginClick(object sender, RoutedEventArgs e) => ReloginRequested?.Invoke();
     void OnExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke();
+    void OnSettingsClick(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
 
     void OnAutoStartToggle(object sender, RoutedEventArgs e)
     {
@@ -94,6 +100,31 @@ public partial class MainWindow : Window
             RebuildRows();
     }
 
+    /// <summary>Applies theme colors, background transparency and UI language.</summary>
+    public void ApplyAppearance()
+    {
+        var bg = ThemeManager.WindowBg;
+        // Alpha floor of 2 keeps the window hit-testable (fully transparent pixels
+        // would become click-through and the widget could no longer be dragged).
+        var alpha = (byte)Math.Clamp(
+            (int)Math.Round(255 * (100 - _settings.BgTransparency) / 100.0), 2, 255);
+        RootBorder.Background = new SolidColorBrush(Color.FromArgb(alpha, bg.R, bg.G, bg.B));
+
+        TitleText.Text = L10n.T("widget_title");
+        TitleText.Foreground = ThemeManager.Brush(ThemeManager.TitleText);
+        StatusText.Foreground = ThemeManager.Brush(ThemeManager.StatusText);
+        ErrorText.Foreground = ThemeManager.Brush(ThemeManager.ErrorText);
+
+        RefreshMenuItem.Header = L10n.T("menu_refresh");
+        HideMenuItem.Header = L10n.T("menu_hide");
+        SettingsMenuItem.Header = L10n.T("menu_settings");
+        AutoStartMenuItem.Header = L10n.T("menu_autostart");
+        ReloginMenuItem.Header = L10n.T("menu_relogin");
+        ExitMenuItem.Header = L10n.T("menu_exit");
+
+        RebuildRows();
+    }
+
     void RebuildRows()
     {
         RowsPanel.Children.Clear();
@@ -103,14 +134,14 @@ public partial class MainWindow : Window
 
     static UIElement BuildRow(UsageBucket bucket)
     {
-        var color = ColorFor(bucket.Utilization);
+        var color = ThemeManager.ColorFor(bucket.Utilization);
         var panel = new StackPanel { Margin = new Thickness(0, 3, 0, 3) };
 
         var header = new DockPanel();
         header.Children.Add(new TextBlock
         {
             Text = bucket.Label,
-            Foreground = new SolidColorBrush(Color.FromRgb(0xB8, 0xB8, 0xC2)),
+            Foreground = ThemeManager.Brush(ThemeManager.LabelText),
             FontSize = 11,
         });
         var pct = new TextBlock
@@ -131,7 +162,7 @@ public partial class MainWindow : Window
         track.Children.Add(new Rectangle
         {
             RadiusX = 2.5, RadiusY = 2.5,
-            Fill = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x3E)),
+            Fill = ThemeManager.Brush(ThemeManager.TrackBg),
         });
         var fillWidth = Math.Clamp(bucket.Utilization, 0, 100) / 100.0 * barWidth;
         track.Children.Add(new Rectangle
@@ -148,7 +179,7 @@ public partial class MainWindow : Window
             panel.Children.Add(new TextBlock
             {
                 Text = UsageParser.FormatCountdown(resetsAt),
-                Foreground = new SolidColorBrush(Color.FromRgb(0x77, 0x77, 0x82)),
+                Foreground = ThemeManager.Brush(ThemeManager.SubtleText),
                 FontSize = 10,
                 Margin = new Thickness(0, 2, 0, 0),
             });
@@ -156,13 +187,6 @@ public partial class MainWindow : Window
 
         return panel;
     }
-
-    public static Color ColorFor(double utilization) => utilization switch
-    {
-        >= 90 => Color.FromRgb(0xF4, 0x51, 0x4E), // red
-        >= 70 => Color.FromRgb(0xF5, 0xA9, 0x3B), // orange
-        _ => Color.FromRgb(0x4C, 0x9F, 0xF0),     // blue
-    };
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {

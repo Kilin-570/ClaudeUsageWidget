@@ -58,6 +58,17 @@ public partial class App : System.Windows.Application
     {
         _settings = Settings.Load();
 
+        L10n.Init(_settings.Language switch
+        {
+            "en" => UiLanguage.En,
+            "zh" => UiLanguage.ZhHant,
+            _ => System.Globalization.CultureInfo.CurrentUICulture.Name
+                     .StartsWith("zh", StringComparison.OrdinalIgnoreCase)
+                 ? UiLanguage.ZhHant
+                 : UiLanguage.En,
+        });
+        ThemeManager.Init(_settings.Theme == "light");
+
         if (!_settings.FirstRunDone)
         {
             AutoStart.Enable();
@@ -76,12 +87,14 @@ public partial class App : System.Windows.Application
         _widget.ReloginRequested += () => PromptLogin(force: true);
         _widget.HideRequested += HideWidget;
         _widget.ExitRequested += ExitApp;
+        _widget.SettingsRequested += ShowSettings;
 
         SetupTray();
 
         if (_settings.WidgetVisible) _widget.Show();
 
-        _fetchTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
+        _backoffSec = BaseIntervalSec;
+        _fetchTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(BaseIntervalSec) };
         _fetchTimer.Tick += (_, _) => _ = FetchAndRenderAsync();
         _fetchTimer.Start();
 
@@ -95,12 +108,18 @@ public partial class App : System.Windows.Application
         }
         else
         {
-            _widget.ShowError("尚未登入，右鍵選「重新登入」或稍候登入視窗。");
+            _widget.ShowError(L10n.T("err_not_signed_in_hint"));
             PromptLogin(force: false);
         }
     }
 
     // ---------- Tray ----------
+
+    WinForms.ToolStripMenuItem _trayShowHide = null!;
+    WinForms.ToolStripMenuItem _trayRefresh = null!;
+    WinForms.ToolStripMenuItem _traySettings = null!;
+    WinForms.ToolStripMenuItem _trayRelogin = null!;
+    WinForms.ToolStripMenuItem _trayExit = null!;
 
     void SetupTray()
     {
@@ -116,12 +135,42 @@ public partial class App : System.Windows.Application
         };
 
         var menu = new WinForms.ContextMenuStrip();
-        menu.Items.Add("顯示 / 隱藏小工具", null, (_, _) => ToggleWidget());
-        menu.Items.Add("立即更新", null, (_, _) => _ = FetchAndRenderAsync());
-        menu.Items.Add("重新登入", null, (_, _) => PromptLogin(force: true));
+        menu.Items.Add(_trayShowHide = new WinForms.ToolStripMenuItem("", null, (_, _) => ToggleWidget()));
+        menu.Items.Add(_trayRefresh = new WinForms.ToolStripMenuItem("", null, (_, _) => _ = FetchAndRenderAsync()));
+        menu.Items.Add(_traySettings = new WinForms.ToolStripMenuItem("", null, (_, _) => ShowSettings()));
+        menu.Items.Add(_trayRelogin = new WinForms.ToolStripMenuItem("", null, (_, _) => PromptLogin(force: true)));
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add("結束", null, (_, _) => ExitApp());
+        menu.Items.Add(_trayExit = new WinForms.ToolStripMenuItem("", null, (_, _) => ExitApp()));
         _tray.ContextMenuStrip = menu;
+
+        ApplyTrayLanguage();
+        L10n.Changed += ApplyTrayLanguage;
+    }
+
+    void ApplyTrayLanguage()
+    {
+        _trayShowHide.Text = L10n.T("menu_showhide");
+        _trayRefresh.Text = L10n.T("menu_refresh");
+        _traySettings.Text = L10n.T("menu_settings");
+        _trayRelogin.Text = L10n.T("menu_relogin");
+        _trayExit.Text = L10n.T("menu_exit");
+    }
+
+    SettingsWindow? _settingsWindow;
+
+    void ShowSettings()
+    {
+        if (_settingsWindow is { IsLoaded: true })
+        {
+            _settingsWindow.Activate();
+            return;
+        }
+        _settingsWindow = new SettingsWindow(_settings, () =>
+        {
+            _widget.ApplyAppearance();
+            ApplyRefreshInterval();
+        });
+        _settingsWindow.Show();
     }
 
     void ToggleWidget()
@@ -153,13 +202,20 @@ public partial class App : System.Windows.Application
 
     // ---------- Data flow ----------
 
-    const int BaseIntervalSec = 60;
-    int _backoffSec = BaseIntervalSec;
+    int BaseIntervalSec => Math.Max(30, _settings.RefreshIntervalSec);
+    int _backoffSec;
+
+    /// <summary>Called when the user changes the refresh interval in settings.</summary>
+    void ApplyRefreshInterval()
+    {
+        _backoffSec = BaseIntervalSec;
+        _fetchTimer.Interval = TimeSpan.FromSeconds(BaseIntervalSec);
+    }
 
     async Task FetchAndRenderAsync()
     {
         if (!_service.HasTokens) return;
-        _widget.ShowLoading("更新中…");
+        _widget.ShowLoading(L10n.T("updating"));
         try
         {
             var buckets = await _service.GetUsageAsync();
@@ -180,18 +236,18 @@ public partial class App : System.Windows.Application
                 : _backoffSec;
             _fetchTimer.Interval = TimeSpan.FromSeconds(waitSec);
             Log.Write($"usage API 限流 (429)，{waitSec:F0} 秒後重試");
-            _widget.ShowNotice($"{DateTime.Now.AddSeconds(waitSec):HH:mm} 重試");
+            _widget.ShowNotice(L10n.F("retry_at", DateTime.Now.AddSeconds(waitSec).ToString("HH:mm")));
         }
         catch (UnauthorizedAccessException ex)
         {
             _widget.ShowError(ex.Message);
-            _tray.Text = "Claude Usage — 需要重新登入";
+            _tray.Text = L10n.T("tray_need_login");
             PromptLogin(force: false);
         }
         catch (Exception ex)
         {
             Log.Error("更新失敗", ex);
-            _widget.ShowError($"更新失敗：{ex.Message}");
+            _widget.ShowError(L10n.F("err_update_prefix", ex.Message));
         }
     }
 

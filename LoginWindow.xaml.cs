@@ -15,13 +15,23 @@ public partial class LoginWindow : Window
     public LoginWindow()
     {
         InitializeComponent();
+
+        Title = L10n.T("login_title");
+        HeadingText.Text = L10n.T("login_heading");
+        BodyText.Text = L10n.T("login_body");
+        BrowserLoginButton.Content = L10n.T("login_browser_btn");
+        ManualExpander.Header = L10n.T("login_manual_expander");
+        ManualStepsText.Text = L10n.T("login_manual_steps");
+        ManualOpenButton.Content = L10n.T("login_manual_open");
+        ManualSubmitButton.Content = L10n.T("login_manual_submit");
+
         Closed += (_, _) => _listenCts?.Cancel();
     }
 
     async void OnBrowserLoginClick(object sender, RoutedEventArgs e)
     {
         BrowserLoginButton.IsEnabled = false;
-        SetStatus("已開啟瀏覽器，等待你完成授權…", ok: true);
+        SetStatus(L10n.T("login_waiting"), ok: true);
         _listenCts?.Cancel();
         _listenCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         try
@@ -32,11 +42,11 @@ public partial class LoginWindow : Window
         catch (OperationCanceledException)
         {
             if (IsLoaded)
-                SetStatus("等待逾時或已取消。可以重試，或改用下方的手動模式。", ok: false);
+                SetStatus(L10n.T("login_timeout"), ok: false);
         }
         catch (Exception ex)
         {
-            SetStatus($"登入失敗：{ex.Message}\n可以改用下方的手動模式。", ok: false);
+            SetStatus(L10n.F("login_failed_with_hint", ex.Message), ok: false);
         }
         finally
         {
@@ -51,11 +61,11 @@ public partial class LoginWindow : Window
         try
         {
             _oauth.OpenManualLoginPage();
-            SetStatus("已開啟手動登入頁，授權後把顯示的代碼貼到下方。", ok: true);
+            SetStatus(L10n.T("login_manual_opened"), ok: true);
         }
         catch (Exception ex)
         {
-            SetStatus($"開啟失敗：{ex.Message}", ok: false);
+            SetStatus(L10n.F("login_open_failed", ex.Message), ok: false);
         }
     }
 
@@ -63,7 +73,7 @@ public partial class LoginWindow : Window
     {
         if (string.IsNullOrWhiteSpace(CodeBox.Text))
         {
-            SetStatus("請先貼上代碼。", ok: false);
+            SetStatus(L10n.T("login_paste_first"), ok: false);
             return;
         }
         ManualSubmitButton.IsEnabled = false;
@@ -74,7 +84,7 @@ public partial class LoginWindow : Window
         }
         catch (Exception ex)
         {
-            SetStatus($"登入失敗：{ex.Message}", ok: false);
+            SetStatus(L10n.F("login_failed", ex.Message), ok: false);
         }
         finally
         {
