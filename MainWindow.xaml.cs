@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     public event Action? HideRequested;
     public event Action? ExitRequested;
     public event Action? SettingsRequested;
+    public event Action? UpdateCheckRequested;
 
     public MainWindow(Settings settings)
     {
@@ -179,6 +180,7 @@ public partial class MainWindow : Window
     void OnReloginClick(object sender, RoutedEventArgs e) => ReloginRequested?.Invoke();
     void OnExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke();
     void OnSettingsClick(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
+    void OnCheckUpdateClick(object sender, RoutedEventArgs e) => UpdateCheckRequested?.Invoke();
 
     void OnAutoStartToggle(object sender, RoutedEventArgs e)
     {
@@ -291,6 +293,7 @@ public partial class MainWindow : Window
         HideMenuItem.Header = L10n.T("menu_hide");
         SettingsMenuItem.Header = L10n.T("menu_settings");
         AutoStartMenuItem.Header = L10n.T("menu_autostart");
+        CheckUpdateMenuItem.Header = L10n.T("menu_check_update");
         ReloginMenuItem.Header = L10n.T("menu_relogin");
         ExitMenuItem.Header = L10n.T("menu_exit");
 

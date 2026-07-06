@@ -17,6 +17,7 @@ A tiny Windows desktop widget that shows your **Claude plan usage in real time**
 - ⏰ **Reset countdown** for each limit (e.g. "resets in 2 hr 38 min")
 - ⚙️ **Settings** — language (English / 繁體中文), dark / light theme, background transparency 0–100%
 - 🚀 **Start with Windows** (optional, on by default, toggle in right-click menu)
+- ⬆️ **Built-in updater** — right-click → *Check for updates* downloads the latest release and swaps itself in place; it also checks quietly on startup and notifies you
 - 🔐 **Sign in once** — browser OAuth (the same flow Claude Code's `/login` uses); tokens are encrypted with Windows DPAPI and stored only on your machine
 
 ## Install / 安裝

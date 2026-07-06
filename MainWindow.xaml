@@ -14,6 +14,7 @@
             <Separator/>
             <MenuItem x:Name="SettingsMenuItem" Header="設定…" Click="OnSettingsClick"/>
             <MenuItem x:Name="AutoStartMenuItem" Header="開機自動啟動" IsCheckable="True" Click="OnAutoStartToggle"/>
+            <MenuItem x:Name="CheckUpdateMenuItem" Header="檢查更新" Click="OnCheckUpdateClick"/>
             <MenuItem x:Name="ReloginMenuItem" Header="重新登入" Click="OnReloginClick"/>
             <Separator/>
             <MenuItem x:Name="ExitMenuItem" Header="結束" Click="OnExitClick"/>

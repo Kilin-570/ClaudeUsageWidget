@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using MessageBox = System.Windows.MessageBox;
 using WinForms = System.Windows.Forms;
 
 namespace ClaudeUsageWidget;
@@ -88,6 +89,9 @@ public partial class App : System.Windows.Application
         _widget.HideRequested += HideWidget;
         _widget.ExitRequested += ExitApp;
         _widget.SettingsRequested += ShowSettings;
+        _widget.UpdateCheckRequested += () => _ = CheckForUpdatesAsync(interactive: true);
+
+        UpdateService.CleanupOldBinary();
 
         SetupTray();
 
@@ -111,6 +115,73 @@ public partial class App : System.Windows.Application
             _widget.ShowError(L10n.T("err_not_signed_in_hint"));
             PromptLogin(force: false);
         }
+
+        _ = AutoCheckUpdatesAsync();
+    }
+
+    // ---------- self-update ----------
+
+    UpdateInfo? _pendingUpdate;
+    bool _updating;
+
+    async Task AutoCheckUpdatesAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(30)); // don't compete with startup work
+        try
+        {
+            _pendingUpdate = await UpdateService.CheckAsync();
+            if (_pendingUpdate is not null)
+            {
+                Log.Write($"發現新版本 v{_pendingUpdate.Latest}");
+                _tray.BalloonTipClicked -= OnUpdateBalloonClicked;
+                _tray.BalloonTipClicked += OnUpdateBalloonClicked;
+                _tray.ShowBalloonTip(8000, "Claude Usage Widget",
+                    L10n.F("update_balloon", _pendingUpdate.Latest), WinForms.ToolTipIcon.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("自動檢查更新失敗", ex); // silent — manual check still available
+        }
+    }
+
+    void OnUpdateBalloonClicked(object? sender, EventArgs e) => _ = CheckForUpdatesAsync(interactive: true);
+
+    async Task CheckForUpdatesAsync(bool interactive)
+    {
+        if (_updating) return;
+        _updating = true;
+        try
+        {
+            var info = _pendingUpdate ?? await UpdateService.CheckAsync();
+            if (info is null)
+            {
+                if (interactive)
+                    MessageBox.Show(L10n.F("update_none", UpdateService.Current),
+                        L10n.T("update_title"), MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var answer = MessageBox.Show(
+                L10n.F("update_found", info.Latest, UpdateService.Current),
+                L10n.T("update_title"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (answer != MessageBoxResult.Yes) return;
+
+            _widget.ShowNotice(L10n.T("update_downloading"));
+            await UpdateService.DownloadAndApplyAsync(info);
+            ExitApp(); // the new version has been started
+        }
+        catch (Exception ex)
+        {
+            Log.Error("更新失敗", ex);
+            if (interactive)
+                MessageBox.Show(L10n.F("update_failed", ex.Message),
+                    L10n.T("update_title"), MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _updating = false;
+        }
     }
 
     // ---------- Tray ----------
@@ -118,6 +189,7 @@ public partial class App : System.Windows.Application
     WinForms.ToolStripMenuItem _trayShowHide = null!;
     WinForms.ToolStripMenuItem _trayRefresh = null!;
     WinForms.ToolStripMenuItem _traySettings = null!;
+    WinForms.ToolStripMenuItem _trayUpdate = null!;
     WinForms.ToolStripMenuItem _trayRelogin = null!;
     WinForms.ToolStripMenuItem _trayExit = null!;
 
@@ -138,6 +210,7 @@ public partial class App : System.Windows.Application
         menu.Items.Add(_trayShowHide = new WinForms.ToolStripMenuItem("", null, (_, _) => ToggleWidget()));
         menu.Items.Add(_trayRefresh = new WinForms.ToolStripMenuItem("", null, (_, _) => _ = FetchAndRenderAsync()));
         menu.Items.Add(_traySettings = new WinForms.ToolStripMenuItem("", null, (_, _) => ShowSettings()));
+        menu.Items.Add(_trayUpdate = new WinForms.ToolStripMenuItem("", null, (_, _) => _ = CheckForUpdatesAsync(interactive: true)));
         menu.Items.Add(_trayRelogin = new WinForms.ToolStripMenuItem("", null, (_, _) => PromptLogin(force: true)));
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(_trayExit = new WinForms.ToolStripMenuItem("", null, (_, _) => ExitApp()));
@@ -152,6 +225,7 @@ public partial class App : System.Windows.Application
         _trayShowHide.Text = L10n.T("menu_showhide");
         _trayRefresh.Text = L10n.T("menu_refresh");
         _traySettings.Text = L10n.T("menu_settings");
+        _trayUpdate.Text = L10n.T("menu_check_update");
         _trayRelogin.Text = L10n.T("menu_relogin");
         _trayExit.Text = L10n.T("menu_exit");
     }
