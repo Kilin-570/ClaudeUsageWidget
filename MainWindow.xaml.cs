@@ -12,6 +12,7 @@ public partial class MainWindow : Window
 {
     readonly Settings _settings;
     List<UsageBucket> _lastBuckets = new();
+    bool _hasError;
 
     public event Action? RefreshRequested;
     public event Action? ReloginRequested;
@@ -73,31 +74,82 @@ public partial class MainWindow : Window
 
     public void ShowError(string message)
     {
+        _hasError = true;
         ErrorText.Text = message;
-        ErrorText.Visibility = Visibility.Visible;
         StatusText.Text = "";
+        ApplyCollapsedState();
     }
 
     /// <summary>Quiet corner note (e.g. transient rate limit) — keeps showing the last data.</summary>
     public void ShowNotice(string message)
     {
-        ErrorText.Visibility = Visibility.Collapsed;
+        _hasError = false;
         StatusText.Text = message;
+        ApplyCollapsedState();
     }
 
     public void ShowUsage(List<UsageBucket> buckets)
     {
         _lastBuckets = buckets;
-        ErrorText.Visibility = Visibility.Collapsed;
+        _hasError = false;
         StatusText.Text = DateTime.Now.ToString("HH:mm");
         RebuildRows();
+        ApplyCollapsedState();
     }
 
     /// <summary>Re-renders countdown text from cached data (called by a UI timer between fetches).</summary>
     public void RefreshCountdowns()
     {
-        if (_lastBuckets.Count > 0 && ErrorText.Visibility == Visibility.Collapsed)
+        if (_lastBuckets.Count > 0 && !_hasError && !_settings.Collapsed)
             RebuildRows();
+    }
+
+    void OnToggleCollapse(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true; // don't start a window drag
+        _settings.Collapsed = !_settings.Collapsed;
+        _settings.Save();
+        ApplyCollapsedState();
+    }
+
+    /// <summary>Shows/hides the usage rows and the compact one-line summary.</summary>
+    void ApplyCollapsedState()
+    {
+        var collapsed = _settings.Collapsed;
+        ToggleGlyph.Text = collapsed ? "▸" : "▾";
+        TitleRow.Margin = new Thickness(0, 0, 0, collapsed ? 0 : 6);
+        RowsPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        CompactText.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+        ErrorText.Visibility = !collapsed && _hasError ? Visibility.Visible : Visibility.Collapsed;
+        if (collapsed) RebuildCompact();
+    }
+
+    /// <summary>Compact summary shown while collapsed: "64% · 28% · 49%" colored per bucket.</summary>
+    void RebuildCompact()
+    {
+        CompactText.Inlines.Clear();
+        if (_hasError)
+        {
+            CompactText.Inlines.Add(new System.Windows.Documents.Run("⚠")
+            {
+                Foreground = ThemeManager.Brush(ThemeManager.ErrorText),
+            });
+            return;
+        }
+        var first = true;
+        foreach (var bucket in _lastBuckets)
+        {
+            if (!first)
+                CompactText.Inlines.Add(new System.Windows.Documents.Run(" · ")
+                {
+                    Foreground = ThemeManager.Brush(ThemeManager.SubtleText),
+                });
+            CompactText.Inlines.Add(new System.Windows.Documents.Run($"{Math.Round(bucket.Utilization)}%")
+            {
+                Foreground = ThemeManager.Brush(ThemeManager.ColorFor(bucket.Utilization)),
+            });
+            first = false;
+        }
     }
 
     /// <summary>Applies theme colors, background transparency and UI language.</summary>
@@ -114,6 +166,7 @@ public partial class MainWindow : Window
         TitleText.Foreground = ThemeManager.Brush(ThemeManager.TitleText);
         StatusText.Foreground = ThemeManager.Brush(ThemeManager.StatusText);
         ErrorText.Foreground = ThemeManager.Brush(ThemeManager.ErrorText);
+        ToggleGlyph.Foreground = ThemeManager.Brush(ThemeManager.StatusText);
 
         RefreshMenuItem.Header = L10n.T("menu_refresh");
         HideMenuItem.Header = L10n.T("menu_hide");
@@ -123,6 +176,7 @@ public partial class MainWindow : Window
         ExitMenuItem.Header = L10n.T("menu_exit");
 
         RebuildRows();
+        ApplyCollapsedState();
     }
 
     void RebuildRows()

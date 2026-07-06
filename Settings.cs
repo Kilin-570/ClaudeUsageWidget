@@ -14,6 +14,7 @@ public class Settings
     public string Theme { get; set; } = "dark";      // "dark" | "light"
     public int BgTransparency { get; set; } = 10;    // 0 = solid, 100 = fully transparent
     public int RefreshIntervalSec { get; set; } = 90;
+    public bool Collapsed { get; set; }
 
     static string Dir => AppPaths.DataDir;
     static string FilePath => Path.Combine(Dir, "settings.json");
