@@ -4,7 +4,9 @@ A tiny Windows desktop widget that shows your **Claude plan usage in real time**
 
 一個常駐 Windows 桌面的小工具，即時顯示你的 **Claude 方案使用量**——和 Claude `/usage` 畫面完全同步（Session %、每週 %、各模型每週 %）。
 
-![screenshot](docs/screenshot.png)
+| Dark theme (繁體中文) | Light theme (English) |
+| :---: | :---: |
+| ![dark](docs/screenshot.png) | ![light](docs/English_light.png) |
 
 ## Features / 功能
 
