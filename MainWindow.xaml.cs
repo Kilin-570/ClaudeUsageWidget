@@ -3,7 +3,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Color = System.Windows.Media.Color;
+using Cursor = System.Windows.Input.Cursor;
+using Cursors = System.Windows.Input.Cursors;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using Point = System.Windows.Point;
 using Rectangle = System.Windows.Shapes.Rectangle;
 
 namespace ClaudeUsageWidget;
@@ -39,6 +43,7 @@ public partial class MainWindow : Window
             Top = area.Top + 16;
         }
 
+        ApplyScale(_settings.UiScale);
         ApplyAppearance();
         L10n.Changed += ApplyAppearance;
         ThemeManager.Changed += ApplyAppearance;
@@ -46,13 +51,127 @@ public partial class MainWindow : Window
         Loaded += (_, _) => AutoStartMenuItem.IsChecked = AutoStart.IsEnabled();
     }
 
-    void OnDragMove(object sender, MouseButtonEventArgs e)
+    // ---------- move & edge-resize ----------
+    // Dragging an edge/corner rescales the whole widget proportionally (the window
+    // auto-fits its content, so "resizing" means changing the UI scale).
+
+    [Flags]
+    enum ResizeEdge { None = 0, Left = 1, Right = 2, Top = 4, Bottom = 8 }
+
+    const double EdgeSize = 8;
+    const double MinScale = 0.7, MaxScale = 2.5;
+
+    bool _resizing;
+    ResizeEdge _edge;
+    Point _startPointer;          // screen DIPs
+    double _startScale, _startWidth, _startHeight, _startRight, _startBottom;
+
+    ResizeEdge HitTestEdge(Point p)
+    {
+        var edge = ResizeEdge.None;
+        if (p.X < EdgeSize) edge |= ResizeEdge.Left;
+        else if (p.X > ActualWidth - EdgeSize) edge |= ResizeEdge.Right;
+        if (p.Y < EdgeSize) edge |= ResizeEdge.Top;
+        else if (p.Y > ActualHeight - EdgeSize) edge |= ResizeEdge.Bottom;
+        return edge;
+    }
+
+    static Cursor CursorFor(ResizeEdge edge)
+    {
+        var h = edge & (ResizeEdge.Left | ResizeEdge.Right);
+        var v = edge & (ResizeEdge.Top | ResizeEdge.Bottom);
+        if (h != 0 && v != 0)
+        {
+            var nwse = edge.HasFlag(ResizeEdge.Left) == edge.HasFlag(ResizeEdge.Top);
+            return nwse ? Cursors.SizeNWSE : Cursors.SizeNESW;
+        }
+        if (h != 0) return Cursors.SizeWE;
+        if (v != 0) return Cursors.SizeNS;
+        return Cursors.Arrow;
+    }
+
+    Point PointerInScreenDips(MouseEventArgs e)
+    {
+        var screen = PointToScreen(e.GetPosition(this));
+        var transform = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice;
+        return transform?.Transform(screen) ?? screen;
+    }
+
+    void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState != MouseButtonState.Pressed) return;
+
+        var edge = HitTestEdge(e.GetPosition(this));
+        if (edge != ResizeEdge.None)
+        {
+            _resizing = true;
+            _edge = edge;
+            _startPointer = PointerInScreenDips(e);
+            _startScale = _settings.UiScale;
+            _startWidth = ActualWidth;
+            _startHeight = ActualHeight;
+            _startRight = Left + ActualWidth;
+            _startBottom = Top + ActualHeight;
+            CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+
         DragMove();
         _settings.WindowLeft = Left;
         _settings.WindowTop = Top;
         _settings.Save();
+    }
+
+    void OnMouseMoveWindow(object sender, MouseEventArgs e)
+    {
+        if (_resizing)
+        {
+            var p = PointerInScreenDips(e);
+            var dx = p.X - _startPointer.X;
+            var dy = p.Y - _startPointer.Y;
+
+            double? byWidth = null, byHeight = null;
+            if (_edge.HasFlag(ResizeEdge.Right)) byWidth = (_startWidth + dx) / _startWidth;
+            if (_edge.HasFlag(ResizeEdge.Left)) byWidth = (_startWidth - dx) / _startWidth;
+            if (_edge.HasFlag(ResizeEdge.Bottom)) byHeight = (_startHeight + dy) / _startHeight;
+            if (_edge.HasFlag(ResizeEdge.Top)) byHeight = (_startHeight - dy) / _startHeight;
+
+            var factor = byWidth is double w && byHeight is double h ? (w + h) / 2
+                : byWidth ?? byHeight ?? 1;
+            var scale = Math.Clamp(_startScale * factor, MinScale, MaxScale);
+
+            ApplyScale(scale);
+            UpdateLayout(); // realize the new ActualWidth/Height before anchoring
+
+            // Keep the edge opposite to the one being dragged anchored in place.
+            if (_edge.HasFlag(ResizeEdge.Left)) Left = _startRight - ActualWidth;
+            if (_edge.HasFlag(ResizeEdge.Top)) Top = _startBottom - ActualHeight;
+            return;
+        }
+
+        Cursor = CursorFor(HitTestEdge(e.GetPosition(this)));
+    }
+
+    void OnMouseUpWindow(object sender, MouseButtonEventArgs e)
+    {
+        if (!_resizing) return;
+        _resizing = false;
+        ReleaseMouseCapture();
+        _settings.WindowLeft = Left;
+        _settings.WindowTop = Top;
+        _settings.Save();
+    }
+
+    void OnMouseLeaveWindow(object sender, MouseEventArgs e)
+    {
+        if (!_resizing) Cursor = Cursors.Arrow;
+    }
+
+    void ApplyScale(double scale)
+    {
+        _settings.UiScale = Math.Clamp(scale, MinScale, MaxScale);
+        RootBorder.LayoutTransform = new ScaleTransform(_settings.UiScale, _settings.UiScale);
     }
 
     void OnRefreshClick(object sender, RoutedEventArgs e) => RefreshRequested?.Invoke();

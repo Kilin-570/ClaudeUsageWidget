@@ -5,7 +5,8 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
-        MouseLeftButtonDown="OnDragMove">
+        MouseLeftButtonDown="OnMouseDown" MouseMove="OnMouseMoveWindow"
+        MouseLeftButtonUp="OnMouseUpWindow" MouseLeave="OnMouseLeaveWindow">
     <Window.ContextMenu>
         <ContextMenu>
             <MenuItem x:Name="RefreshMenuItem" Header="立即更新" Click="OnRefreshClick"/>

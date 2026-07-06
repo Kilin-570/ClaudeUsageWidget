@@ -11,6 +11,7 @@ A tiny Windows desktop widget that shows your **Claude plan usage in real time**
 ## Features / 功能
 
 - 🪟 **Floating widget** — always-on-top, draggable, remembers position
+- 📏 **Resizable** — drag any edge/corner to scale the whole widget (0.7×–2.5×); collapse it to a slim one-line summary with the ▾ button
 - 🔔 **Tray icon** — live percentage ring drawn into the icon; hover for details, left-click to show/hide
 - 🔄 **Auto refresh** (60 s / 90 s / 2 min / 5 min, default 90 s); colors shift orange at 70% and red at 90%
 - ⏰ **Reset countdown** for each limit (e.g. "resets in 2 hr 38 min")

@@ -15,6 +15,7 @@ public class Settings
     public int BgTransparency { get; set; } = 10;    // 0 = solid, 100 = fully transparent
     public int RefreshIntervalSec { get; set; } = 90;
     public bool Collapsed { get; set; }
+    public double UiScale { get; set; } = 1.0;   // 0.7–2.5, drag widget edges to change
 
     static string Dir => AppPaths.DataDir;
     static string FilePath => Path.Combine(Dir, "settings.json");
