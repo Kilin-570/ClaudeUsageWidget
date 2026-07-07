@@ -49,6 +49,11 @@ public partial class MainWindow : Window
         L10n.Changed += ApplyAppearance;
         ThemeManager.Changed += ApplyAppearance;
 
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible && _rowsDirty) UpdateRows(); // catch up on data fetched while hidden
+        };
+
         Loaded += (_, _) => AutoStartMenuItem.IsChecked = AutoStart.IsEnabled();
     }
 
@@ -214,15 +219,18 @@ public partial class MainWindow : Window
         _lastBuckets = buckets;
         _hasError = false;
         StatusText.Text = DateTime.Now.ToString("HH:mm");
-        RebuildRows();
+        if (IsVisible) UpdateRows();
+        else _rowsDirty = true; // hidden (tray-only): defer UI work until shown again
         ApplyCollapsedState();
     }
 
     /// <summary>Re-renders countdown text from cached data (called by a UI timer between fetches).</summary>
     public void RefreshCountdowns()
     {
-        if (_lastBuckets.Count > 0 && !_hasError && !_settings.Collapsed)
-            RebuildRows();
+        if (!IsVisible || _hasError || _settings.Collapsed) return;
+        foreach (var row in _rows)
+            if (row.ResetsAt is DateTimeOffset resetsAt)
+                row.Countdown.Text = UsageParser.FormatCountdown(resetsAt);
     }
 
     void OnToggleCollapse(object sender, MouseButtonEventArgs e)
@@ -301,67 +309,123 @@ public partial class MainWindow : Window
         ApplyCollapsedState();
     }
 
+    // Rows are created once and updated in place on each refresh — rebuilding the whole
+    // visual tree every 30-90s churned the GC and kept the render pipeline busy.
+    sealed class UsageRow
+    {
+        public required string Key;
+        public required StackPanel Panel;
+        public required TextBlock Label;
+        public required TextBlock Pct;
+        public required Rectangle Fill;
+        public required TextBlock Countdown;
+        public DateTimeOffset? ResetsAt;
+    }
+
+    readonly List<UsageRow> _rows = new();
+    bool _rowsDirty;
+    const double BarWidth = 195;
+
     void RebuildRows()
     {
         RowsPanel.Children.Clear();
+        _rows.Clear();
         foreach (var bucket in _lastBuckets)
-            RowsPanel.Children.Add(BuildRow(bucket));
+        {
+            var row = CreateRow(bucket);
+            _rows.Add(row);
+            RowsPanel.Children.Add(row.Panel);
+            UpdateRow(row, bucket);
+        }
     }
 
-    static UIElement BuildRow(UsageBucket bucket)
+    void UpdateRows()
     {
-        var color = ThemeManager.ColorFor(bucket.Utilization);
+        _rowsDirty = false;
+        var structureMatches = _rows.Count == _lastBuckets.Count &&
+            _rows.Zip(_lastBuckets).All(pair => pair.First.Key == pair.Second.Key);
+        if (!structureMatches)
+        {
+            RebuildRows();
+            return;
+        }
+        foreach (var (row, bucket) in _rows.Zip(_lastBuckets))
+            UpdateRow(row, bucket);
+    }
+
+    static void UpdateRow(UsageRow row, UsageBucket bucket)
+    {
+        var brush = ThemeManager.Brush(ThemeManager.ColorFor(bucket.Utilization));
+        row.ResetsAt = bucket.ResetsAt;
+        row.Label.Text = bucket.Label;
+        row.Pct.Text = $"{Math.Round(bucket.Utilization)}%";
+        row.Pct.Foreground = brush;
+        row.Fill.Fill = brush;
+        row.Fill.Width = Math.Max(Math.Clamp(bucket.Utilization, 0, 100) / 100.0 * BarWidth, 2);
+        if (bucket.ResetsAt is DateTimeOffset resetsAt)
+        {
+            row.Countdown.Text = UsageParser.FormatCountdown(resetsAt);
+            row.Countdown.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            row.Countdown.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    static UsageRow CreateRow(UsageBucket bucket)
+    {
         var panel = new StackPanel { Margin = new Thickness(0, 3, 0, 3) };
 
-        var header = new DockPanel();
-        header.Children.Add(new TextBlock
+        var label = new TextBlock
         {
-            Text = bucket.Label,
             Foreground = ThemeManager.Brush(ThemeManager.LabelText),
             FontSize = 11,
-        });
+        };
         var pct = new TextBlock
         {
-            Text = $"{Math.Round(bucket.Utilization)}%",
-            Foreground = new SolidColorBrush(color),
             FontSize = 12,
             FontWeight = FontWeights.Bold,
             HorizontalAlignment = HorizontalAlignment.Right,
         };
+        var header = new DockPanel();
         DockPanel.SetDock(pct, Dock.Right);
         header.Children.Add(pct);
+        header.Children.Add(label);
         panel.Children.Add(header);
 
-        // progress bar
-        const double barWidth = 195;
-        var track = new Grid { Height = 5, Width = barWidth, Margin = new Thickness(0, 3, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
+        var fill = new Rectangle
+        {
+            RadiusX = 2.5, RadiusY = 2.5,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        var track = new Grid { Height = 5, Width = BarWidth, Margin = new Thickness(0, 3, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
         track.Children.Add(new Rectangle
         {
             RadiusX = 2.5, RadiusY = 2.5,
             Fill = ThemeManager.Brush(ThemeManager.TrackBg),
         });
-        var fillWidth = Math.Clamp(bucket.Utilization, 0, 100) / 100.0 * barWidth;
-        track.Children.Add(new Rectangle
-        {
-            RadiusX = 2.5, RadiusY = 2.5,
-            Width = Math.Max(fillWidth, 2),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Fill = new SolidColorBrush(color),
-        });
+        track.Children.Add(fill);
         panel.Children.Add(track);
 
-        if (bucket.ResetsAt is DateTimeOffset resetsAt)
+        var countdown = new TextBlock
         {
-            panel.Children.Add(new TextBlock
-            {
-                Text = UsageParser.FormatCountdown(resetsAt),
-                Foreground = ThemeManager.Brush(ThemeManager.SubtleText),
-                FontSize = 10,
-                Margin = new Thickness(0, 2, 0, 0),
-            });
-        }
+            Foreground = ThemeManager.Brush(ThemeManager.SubtleText),
+            FontSize = 10,
+            Margin = new Thickness(0, 2, 0, 0),
+            Visibility = Visibility.Collapsed,
+        };
+        panel.Children.Add(countdown);
 
-        return panel;
+        return new UsageRow
+        {
+            Key = bucket.Key,
+            Panel = panel,
+            Label = label,
+            Pct = pct,
+            Fill = fill,
+            Countdown = countdown,
+        };
     }
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)

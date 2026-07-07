@@ -325,17 +325,26 @@ public partial class App : System.Windows.Application
         }
     }
 
+    int? _lastTrayPct;
+
     void UpdateTray(List<UsageBucket> buckets)
     {
         var session = buckets.FirstOrDefault(b => b.Key is "session" or "five_hour") ?? buckets.FirstOrDefault();
 
-        var old = _tray.Icon;
-        _tray.Icon = TrayIconRenderer.Render(session?.Utilization);
-        old?.Dispose();
+        // Redraw the icon only when the displayed integer actually changes.
+        var pct = session is null ? (int?)null : (int)Math.Round(session.Utilization);
+        if (pct != _lastTrayPct)
+        {
+            _lastTrayPct = pct;
+            var old = _tray.Icon;
+            _tray.Icon = TrayIconRenderer.Render(session?.Utilization);
+            old?.Dispose();
+        }
 
         // NotifyIcon tooltip is limited to 127 chars.
         var tip = string.Join("\n", buckets.Select(b => $"{b.Label}: {Math.Round(b.Utilization)}%"));
-        _tray.Text = tip.Length > 127 ? tip[..127] : tip;
+        if (_tray.Text != (tip.Length > 127 ? tip[..127] : tip))
+            _tray.Text = tip.Length > 127 ? tip[..127] : tip;
     }
 
     void PromptLogin(bool force)

@@ -205,7 +205,16 @@ public class AnthropicOAuth
                 ?? (resp.Headers.RetryAfter?.Date is DateTimeOffset d ? d - DateTimeOffset.UtcNow : null));
         if (!resp.IsSuccessStatusCode)
             throw new InvalidOperationException($"usage API 失敗 ({(int)resp.StatusCode}): {Truncate(body)}");
-        return UsageParser.Parse(body);
+
+        var buckets = UsageParser.Parse(body);
+        if (buckets.Count == 0)
+        {
+            // HTTP 200 but nothing we recognize — the API schema probably changed.
+            // Log the raw payload so a bug report / next debugging session has evidence.
+            Log.Write($"usage 回應解析不到任何額度資料，原始內容: {Truncate(body)}");
+            throw new InvalidOperationException(L10n.T("err_schema_changed"));
+        }
+        return buckets;
     }
 
     static string Truncate(string s) => s.Length > 300 ? s[..300] + "…" : s;

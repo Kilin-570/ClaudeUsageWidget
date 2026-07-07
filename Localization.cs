@@ -48,6 +48,7 @@ public static class L10n
         ["err_token_expired"] = ("Token 已過期,請重新登入", "Session expired — please sign in again"),
         ["err_refresh_failed"] = ("Token 刷新失敗,請重新登入({0})", "Token refresh failed — please sign in again ({0})"),
         ["err_network"] = ("網路暫時無法連線({0})", "Network temporarily unavailable ({0})"),
+        ["err_schema_changed"] = ("無法解析用量資料,API 格式可能已變更。請「檢查更新」,若已是最新版請到 GitHub 回報。", "Couldn't parse usage data — the API format may have changed. Try \"Check for updates\", or report it on GitHub if you're up to date."),
         // login window
         ["login_title"] = ("登入 Claude 帳號", "Sign in to Claude"),
         ["login_heading"] = ("連結你的 Claude 帳號", "Connect your Claude account"),

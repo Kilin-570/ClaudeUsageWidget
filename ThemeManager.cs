@@ -33,7 +33,19 @@ public static class ThemeManager
         _ => IsLight ? C(0x1F, 0x6F, 0xD4) : C(0x4C, 0x9F, 0xF0),     // blue
     };
 
-    public static SolidColorBrush Brush(Color c) => new(c);
+    // Frozen brushes are immutable, shareable and skip per-element change tracking.
+    static readonly Dictionary<Color, SolidColorBrush> BrushCache = new();
+
+    public static SolidColorBrush Brush(Color c)
+    {
+        if (!BrushCache.TryGetValue(c, out var brush))
+        {
+            brush = new SolidColorBrush(c);
+            brush.Freeze();
+            BrushCache[c] = brush;
+        }
+        return brush;
+    }
 
     static Color C(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
 }
