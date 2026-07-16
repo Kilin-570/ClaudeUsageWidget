@@ -9,11 +9,9 @@ A small, open-source Windows desktop widget for checking **Claude plan usage** a
 >
 > ChatGPT 分頁顯示 OpenAI Codex 回傳的 5 小時、每週等額度；它**不代表**一般 ChatGPT 對話中所有模型的訊息上限。OpenAI 公開的 Usage API 是 API 組織用量，兩者是不同產品範圍。
 
-| Dark theme | Light theme |
+| ChatGPT usage | Claude usage |
 | :---: | :---: |
-| ![Dark theme](docs/screenshot.png) | ![Light theme](docs/English_light.png) |
-
-_The screenshots above are from the original Claude-only UI. Version 2 adds a compact Claude / ChatGPT provider switch above the usage rows._
+| ![ChatGPT usage](docs/ChatGPT.png) | ![Claude usage](docs/Claude.png) |
 
 ## What it shows
 
