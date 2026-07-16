@@ -1,0 +1,25 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build widget
+        run: dotnet build ClaudeUsageWidget.csproj -c Release --nologo
+      - name: Build mock Codex app-server
+        run: dotnet publish tests/CodexAppServerMock/CodexAppServerMock.csproj -c Release -r win-x64 --self-contained false -o tests/mock-out
+      - name: Run smoke tests
+        run: dotnet run --project tests/ClaudeUsageWidget.SmokeTests/ClaudeUsageWidget.SmokeTests.csproj -c Release -- tests/mock-out/CodexAppServerMock.exe

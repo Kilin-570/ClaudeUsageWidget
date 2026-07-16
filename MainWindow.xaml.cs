@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     readonly Settings _settings;
     List<UsageBucket> _lastBuckets = new();
     bool _hasError;
+    UsageProviderKind _activeProvider;
 
     public event Action? RefreshRequested;
     public event Action? ReloginRequested;
@@ -24,10 +25,14 @@ public partial class MainWindow : Window
     public event Action? ExitRequested;
     public event Action? SettingsRequested;
     public event Action? UpdateCheckRequested;
+    public event Action<UsageProviderKind>? ProviderChanged;
+
+    public UsageProviderKind ActiveProvider => _activeProvider;
 
     public MainWindow(Settings settings)
     {
         _settings = settings;
+        _activeProvider = UsageProviderKindExtensions.ParseProvider(_settings.ActiveProvider);
         InitializeComponent();
 
         if (_settings.WindowLeft is double left && _settings.WindowTop is double top)
@@ -186,6 +191,31 @@ public partial class MainWindow : Window
     void OnExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke();
     void OnSettingsClick(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
     void OnCheckUpdateClick(object sender, RoutedEventArgs e) => UpdateCheckRequested?.Invoke();
+    void OnClaudeProviderClick(object sender, RoutedEventArgs e) => SelectProvider(UsageProviderKind.Claude);
+    void OnChatGptProviderClick(object sender, RoutedEventArgs e) => SelectProvider(UsageProviderKind.ChatGpt);
+
+    void SelectProvider(UsageProviderKind provider)
+    {
+        if (_activeProvider == provider) return;
+        _activeProvider = provider;
+        _settings.ActiveProvider = provider.StorageKey();
+        _settings.Save();
+        _lastBuckets = new List<UsageBucket>();
+        _hasError = false;
+        RowsPanel.Children.Clear();
+        _rows.Clear();
+        StatusText.Text = L10n.T("updating");
+        ApplyProviderButtons();
+        ApplyCollapsedState();
+        ProviderChanged?.Invoke(provider);
+    }
+
+    public void SetActiveProvider(UsageProviderKind provider)
+    {
+        _activeProvider = provider;
+        _settings.ActiveProvider = provider.StorageKey();
+        ApplyProviderButtons();
+    }
 
     void OnAutoStartToggle(object sender, RoutedEventArgs e)
     {
@@ -248,6 +278,7 @@ public partial class MainWindow : Window
         ToggleGlyph.Text = collapsed ? "▸" : "▾";
         TitleRow.Margin = new Thickness(0, 0, 0, collapsed ? 0 : 6);
         RowsPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        ProviderPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
         CompactText.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
         ErrorText.Visibility = !collapsed && _hasError ? Visibility.Visible : Visibility.Collapsed;
         if (collapsed) RebuildCompact();
@@ -305,8 +336,41 @@ public partial class MainWindow : Window
         ReloginMenuItem.Header = L10n.T("menu_relogin");
         ExitMenuItem.Header = L10n.T("menu_exit");
 
+        ClaudeProviderButton.Content = L10n.T("provider_claude");
+        ChatGptProviderButton.Content = L10n.T("provider_chatgpt");
+        ApplyProviderButtons();
+
         RebuildRows();
         ApplyCollapsedState();
+    }
+
+    void ApplyProviderButtons()
+    {
+        if (ClaudeProviderButton is null || ChatGptProviderButton is null) return;
+        var selectedBg = ThemeManager.IsLight
+            ? ThemeManager.Brush(Color.FromRgb(0xDE, 0xE9, 0xF8))
+            : ThemeManager.Brush(Color.FromRgb(0x2C, 0x3A, 0x52));
+        var idleBg = ThemeManager.IsLight
+            ? ThemeManager.Brush(Color.FromRgb(0xF1, 0xF1, 0xF5))
+            : ThemeManager.Brush(Color.FromRgb(0x24, 0x24, 0x30));
+        var border = ThemeManager.IsLight
+            ? ThemeManager.Brush(Color.FromRgb(0xC9, 0xC9, 0xD2))
+            : ThemeManager.Brush(Color.FromRgb(0x43, 0x43, 0x50));
+
+        foreach (var (button, provider) in new[]
+                 {
+                     (ClaudeProviderButton, UsageProviderKind.Claude),
+                     (ChatGptProviderButton, UsageProviderKind.ChatGpt),
+                 })
+        {
+            var selected = provider == _activeProvider;
+            button.Background = selected ? selectedBg : idleBg;
+            button.BorderBrush = border;
+            button.Foreground = selected
+                ? ThemeManager.Brush(ThemeManager.TitleText)
+                : ThemeManager.Brush(ThemeManager.LabelText);
+            button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+        }
     }
 
     // Rows are created once and updated in place on each refresh — rebuilding the whole
