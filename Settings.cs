@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Win32;
 
 namespace ClaudeUsageWidget;
@@ -16,6 +17,10 @@ public class Settings
     public int RefreshIntervalSec { get; set; } = 90;
     public bool Collapsed { get; set; }
     public double UiScale { get; set; } = 1.0;   // 0.7–2.5, drag widget edges to change
+    public string ActiveProvider { get; set; } = "claude";
+    public string? CodexExecutablePath { get; set; }
+    [JsonIgnore]
+    public bool DoNotPersist { get; set; }
 
     static string Dir => AppPaths.DataDir;
     static string FilePath => Path.Combine(Dir, "settings.json");
@@ -33,6 +38,7 @@ public class Settings
 
     public void Save()
     {
+        if (DoNotPersist) return;
         try
         {
             Directory.CreateDirectory(Dir);
@@ -67,7 +73,7 @@ public static class AutoStart
             lnk.TargetPath = exe;
             lnk.Arguments = "--autostart"; // tells the app to delay init until the profile is ready
             lnk.WorkingDirectory = Path.GetDirectoryName(exe);
-            lnk.Description = "Claude Usage Widget";
+            lnk.Description = "Claude + ChatGPT Usage Widget";
             lnk.Save();
             Log.Write($"已建立啟動捷徑: {ShortcutPath} -> {exe}");
         }

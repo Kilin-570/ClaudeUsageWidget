@@ -1,91 +1,131 @@
-# Claude Usage Widget
+# Claude + ChatGPT Usage Widget
 
-A tiny Windows desktop widget that shows your **Claude plan usage in real time** — the same numbers you see on Claude's `/usage` screen (session %, weekly %, per-model weekly %), always visible on your desktop.
+A small, open-source Windows desktop widget for checking **Claude plan usage** and **ChatGPT/Codex quota windows** in one place. Switch providers from the widget or tray menu without opening two usage pages.
 
-一個常駐 Windows 桌面的小工具，即時顯示你的 **Claude 方案使用量**——和 Claude `/usage` 畫面完全同步（Session %、每週 %、各模型每週 %）。
+一個小巧的 Windows 桌面用量工具，可在同一個小工具中切換查看 **Claude 方案用量**與 **ChatGPT 帳號下的 Codex 額度**。
 
-| Dark theme (繁體中文) | Light theme (English) |
-| :---: | :---: |
-| ![dark](docs/screenshot.png) | ![light](docs/English_light.png) |
-
-## Features / 功能
-
-- 🪟 **Floating widget** — always-on-top, draggable, remembers position
-- 📏 **Resizable** — drag any edge/corner to scale the whole widget (0.7×–2.5×); collapse it to a slim one-line summary with the ▾ button
-- 🔔 **Tray icon** — live percentage ring drawn into the icon; hover for details, left-click to show/hide
-- 🔄 **Auto refresh** (60 s / 90 s / 2 min / 5 min, default 90 s); colors shift orange at 70% and red at 90%
-- ⏰ **Reset countdown** for each limit (e.g. "resets in 2 hr 38 min")
-- ⚙️ **Settings** — language (English / 繁體中文), dark / light theme, background transparency 0–100%
-- 🚀 **Start with Windows** (optional, on by default, toggle in right-click menu)
-- ⬆️ **Built-in updater** — right-click → *Check for updates* downloads the latest release and swaps itself in place; it also checks quietly on startup and notifies you
-- 🔐 **Sign in once** — browser OAuth (the same flow Claude Code's `/login` uses); tokens are encrypted with Windows DPAPI and stored only on your machine
-
-## Install / 安裝
-
-### Option A — Download (recommended)
-
-1. Grab the latest `ClaudeUsageWidget-win-x64.zip` from [Releases](../../releases)
-2. Unzip anywhere (e.g. `C:\Tools\ClaudeUsageWidget\`) and run `ClaudeUsageWidget.exe`
-3. A login window appears — click **開啟瀏覽器登入 / Sign in with browser** and authorize with your Claude account
-4. Done. The widget appears in the top-right corner; drag it wherever you like.
-
-> **Windows SmartScreen note:** the exe is not code-signed, so the first launch may show "Windows protected your PC". Click **More info → Run anyway**. If you prefer, build from source instead (below).
+> [!IMPORTANT]
+> The ChatGPT tab shows the quota windows returned by OpenAI Codex, such as the 5-hour and weekly limits. It does **not** claim to show every model-specific message limit from normal ChatGPT conversations. OpenAI's public Usage API is for API organization activity and is a separate product surface.
 >
-> **SmartScreen 提示**：exe 沒有付費數位簽章，第一次執行可能出現「Windows 已保護您的電腦」，點「其他資訊 → 仍要執行」即可。不放心的話也可以自行從原始碼編譯（見下方）。
+> ChatGPT 分頁顯示 OpenAI Codex 回傳的 5 小時、每週等額度；它**不代表**一般 ChatGPT 對話中所有模型的訊息上限。OpenAI 公開的 Usage API 是 API 組織用量，兩者是不同產品範圍。
 
-### Option B — Build from source
+| Dark theme | Light theme |
+| :---: | :---: |
+| ![Dark theme](docs/screenshot.png) | ![Light theme](docs/English_light.png) |
+
+_The screenshots above are from the original Claude-only UI. Version 2 adds a compact Claude / ChatGPT provider switch above the usage rows._
+
+## What it shows
+
+### Claude
+
+- Current session usage
+- Weekly overall usage
+- Weekly model-scoped rows returned by Claude
+- Reset countdown for each quota window
+
+### ChatGPT / Codex
+
+- Primary quota window, normally the 5-hour limit
+- Secondary quota window, normally the weekly limit
+- Reset countdown for each window
+- Data obtained through OpenAI's official, stable [`codex app-server` account API](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md#auth-endpoints)
+
+The widget deliberately does not request or store an OpenAI API key. The public [OpenAI Usage API](https://platform.openai.com/docs/api-reference/usage) reports API organization activity and requires an organization admin key; that is not the same as a personal ChatGPT/Codex allowance.
+
+## Features
+
+- **Two providers, one widget** — switch between Claude and ChatGPT from the widget or tray menu
+- **Floating and always on top** — draggable, resizable, and remembers its position
+- **Compact mode** — collapse the widget to a one-line percentage summary
+- **Tray icon** — live percentage ring for the active provider
+- **Automatic refresh** — 60 s / 90 s / 2 min / 5 min; 90 s by default
+- **Reset countdowns** — updated locally between network refreshes
+- **Themes and language** — dark/light and Traditional Chinese/English
+- **Start with Windows** — Startup-folder shortcut with delayed launch
+- **Built-in updater** — checks this repository's GitHub Releases
+- **No telemetry** — no analytics, advertising, or third-party relay server
+
+## Install
+
+### Download a release
+
+1. Download `ClaudeUsageWidget-win-x64.zip` from [Releases](../../releases).
+2. Extract it to a normal folder, for example `C:\Tools\ClaudeUsageWidget\`.
+3. Run `ClaudeUsageWidget.exe`.
+
+The executable keeps its original name so existing v1 users can update in place.
+
+> Windows SmartScreen may warn because the release is not code-signed. You can inspect the source and build it yourself if you prefer.
+
+### Claude setup
+
+On first use, choose Claude and complete the browser sign-in. Claude tokens are encrypted with Windows DPAPI and stored under `%APPDATA%\ClaudeUsageWidget\tokens.dat` for the current Windows user only.
+
+### ChatGPT / Codex setup
+
+1. Install and sign in to the official [OpenAI Codex](https://github.com/openai/codex) CLI or desktop app.
+2. Select **ChatGPT** in the widget.
+3. If needed, right-click and choose **Connect / sign in again**. The widget asks Codex to open the official ChatGPT login flow.
+4. If Codex is not found automatically, open **Settings** and choose `codex.exe`, `codex.cmd`, or `codex.bat`.
+
+The widget communicates with a local Codex child process over redirected stdin/stdout. It never opens, parses, copies, or uploads Codex's `auth.json`.
+
+## Build from source
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```powershell
 git clone https://github.com/Kilin-570/ClaudeUsageWidget.git
 cd ClaudeUsageWidget
-dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o dist
-.\dist\ClaudeUsageWidget.exe
+dotnet build ClaudeUsageWidget.csproj -c Release
+dotnet publish ClaudeUsageWidget.csproj -c Release -r win-x64 --self-contained `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist
 ```
 
-### Upgrading from an older version / 從舊版升級
+Run the smoke tests:
 
-Since v1.4.0 the app updates itself (right-click → **Check for updates**). If you're on an older version, upgrade once manually:
+```powershell
+dotnet publish tests\CodexAppServerMock\CodexAppServerMock.csproj `
+  -c Release -r win-x64 --self-contained false -o tests\mock-out
+dotnet run --project tests\ClaudeUsageWidget.SmokeTests\ClaudeUsageWidget.SmokeTests.csproj `
+  -c Release -- tests\mock-out\CodexAppServerMock.exe
+```
 
-1. Right-click the tray icon → **Exit / 結束**
-2. Download the latest zip and overwrite your old `ClaudeUsageWidget.exe` with the new one
-3. Run it — your sign-in, settings and auto-start are all kept (they live in `%APPDATA%\ClaudeUsageWidget`, not next to the exe)
+The tests use a local mock app-server and contain no real account credentials or usage data.
 
-從 v1.4.0 起內建自動更新（右鍵 →「檢查更新」）。更舊的版本請手動升級一次：結束程式 → 用新 exe 覆蓋舊 exe → 重新執行即可，登入與設定都會保留。
+## Privacy and security
 
-### Uninstall / 完整移除
+- **Claude:** OAuth tokens are stored locally with Windows DPAPI, scoped to the current Windows account.
+- **ChatGPT:** the widget stores no ChatGPT token and does not read Codex credential files. Codex owns the browser login, token storage, refresh, and OpenAI request.
+- **Network:** the widget has no developer-operated backend and sends no telemetry. Claude usage is read from Anthropic; ChatGPT/Codex usage is requested through the local official Codex process; update checks go to GitHub Releases.
+- **Logs:** Codex app-server stdout/stderr is not copied into widget logs, reducing the chance of local account metadata appearing in diagnostics.
+- **Repository hygiene:** credential-shaped local files and signing keys are ignored. Release builds are scanned before publishing.
 
-1. Right-click the tray icon → **Exit / 結束**, then delete `ClaudeUsageWidget.exe`
-2. Delete `%APPDATA%\ClaudeUsageWidget\` (encrypted tokens & settings)
-3. Delete the `ClaudeUsageWidget` shortcut in `shell:startup` if present
-4. Optionally revoke the app's access in your Claude account settings
+See [Security design](docs/SECURITY.md) and [Architecture](docs/ARCHITECTURE.md) for the complete boundaries and trade-offs.
 
-## Privacy & security / 隱私與安全
+## Updating
 
-- Your OAuth tokens are stored **only on your PC**, encrypted with Windows DPAPI (only your Windows account can decrypt them): `%APPDATA%\ClaudeUsageWidget\tokens.dat`
-- The app talks **only to Anthropic's official endpoints** (`claude.ai`, `console.anthropic.com`, `api.anthropic.com`). No telemetry, no third-party servers.
-- It only **reads** usage percentages. Checking your usage does not consume tokens and does not cost anything.
-- Sign out anytime: right-click the widget → 重新登入, or delete `%APPDATA%\ClaudeUsageWidget\`.
+From v1.4.0 onward, right-click the widget and choose **Check for updates**. To update manually, exit the app and overwrite the old executable. Tokens and settings remain under `%APPDATA%\ClaudeUsageWidget`, so replacing the executable does not remove them.
 
-<!-- 中文 -->
-- Token 只加密儲存在你自己的電腦（Windows DPAPI，只有你的 Windows 帳號能解密）
-- 程式只連 Anthropic 官方端點，沒有遙測、不經過任何第三方伺服器
-- 只「讀取」用量百分比——查看用量不消耗 token、不會產生費用
+## Uninstall
 
-## FAQ
+1. Exit from the tray menu.
+2. Delete `ClaudeUsageWidget.exe`.
+3. Delete `%APPDATA%\ClaudeUsageWidget\` to remove Claude tokens, settings, and local logs.
+4. Delete the `ClaudeUsageWidget` shortcut from `shell:startup` if present.
+5. ChatGPT credentials remain managed by Codex; use Codex's own logout command if you also want to sign out there.
 
-**Does it work with Pro / Max plans?** Yes — it shows whatever limits your plan has (session, weekly, per-model weekly). Buckets are parsed dynamically, so new limit types show up automatically.
+## Known limitations
 
-**Why does it need me to sign in? Can't it read Claude Code's login?** Claude Code's desktop app keeps its token in encrypted app-internal storage that external tools can't (and shouldn't) touch. This widget does its own one-time OAuth sign-in instead.
+- Claude's usage endpoint is used by first-party clients but is not a documented public Anthropic API. It may change.
+- The ChatGPT integration requires a Codex version that supports `account/rateLimits/read`.
+- ChatGPT/Codex quota values come from OpenAI and can be unavailable temporarily.
+- Releases are not code-signed yet.
 
-**Will this get my account banned?** The widget uses the same official OAuth flow and usage endpoint that Claude's own clients use, read-only. That said, the usage endpoint is not a documented public API — see the disclaimer below.
+## Disclaimer
 
-## Disclaimer / 免責聲明
-
-This is an **unofficial**, community-made tool. It is **not affiliated with or endorsed by Anthropic**. It relies on endpoints used by Claude's first-party clients which are not part of the documented public API and may change or stop working at any time. Use at your own discretion.
-
-本工具為**非官方**社群作品，與 Anthropic 無關，亦未獲其背書。所依賴的端點並非公開文件化 API，隨時可能變動或失效，請自行斟酌使用。
+This is an unofficial community project. It is not affiliated with or endorsed by Anthropic or OpenAI. Claude, ChatGPT, Codex, and the related marks belong to their respective owners.
 
 ## License
 

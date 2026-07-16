@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Color = System.Windows.Media.Color;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace ClaudeUsageWidget;
 
@@ -29,6 +30,7 @@ public partial class SettingsWindow : Window
             }
         }
         OpacitySlider.Value = _settings.BgTransparency;
+        CodexPathBox.Text = _settings.CodexExecutablePath ?? "";
 
         ApplyAppearance();
         _initializing = false;
@@ -74,6 +76,30 @@ public partial class SettingsWindow : Window
         _onChanged();
     }
 
+    void OnCodexBrowseClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = L10n.T("settings_codex_path"),
+            Filter = "Codex executable|codex.exe;codex.cmd;codex.bat|Executable files|*.exe;*.cmd;*.bat|All files|*.*",
+            CheckFileExists = true,
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        CodexPathBox.Text = dialog.FileName;
+        SaveCodexPath();
+    }
+
+    void OnCodexPathLostFocus(object sender, RoutedEventArgs e) => SaveCodexPath();
+
+    void SaveCodexPath()
+    {
+        if (_initializing) return;
+        var value = CodexPathBox.Text.Trim();
+        _settings.CodexExecutablePath = value.Length == 0 ? null : value;
+        _settings.Save();
+        _onChanged();
+    }
+
     void ApplyAppearance()
     {
         Title = L10n.T("settings_title");
@@ -89,6 +115,9 @@ public partial class SettingsWindow : Window
         OpacityLabel.Text = L10n.T("settings_opacity");
         OpacityValue.Text = $"{(int)OpacitySlider.Value}%";
         OpacityHint.Text = L10n.T("settings_opacity_hint");
+        CodexPathLabel.Text = L10n.T("settings_codex_path");
+        CodexBrowseButton.Content = L10n.T("settings_codex_browse");
+        CodexPathHint.Text = L10n.T("settings_codex_hint");
 
         var bg = ThemeManager.IsLight ? Color.FromRgb(0xFA, 0xFA, 0xFC) : Color.FromRgb(0x1E, 0x1E, 0x28);
         Background = new SolidColorBrush(bg);
@@ -99,5 +128,7 @@ public partial class SettingsWindow : Window
         OpacityLabel.Foreground = fg;
         OpacityValue.Foreground = fg;
         OpacityHint.Foreground = ThemeManager.Brush(ThemeManager.SubtleText);
+        CodexPathLabel.Foreground = fg;
+        CodexPathHint.Foreground = ThemeManager.Brush(ThemeManager.SubtleText);
     }
 }

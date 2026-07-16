@@ -4,4 +4,13 @@ dist/
 *.user
 *.suo
 .vs/
-dist-release/
+dist-release*/
+tests/mock-out/
+*.old
+*.pfx
+*.snk
+.env
+.env.*
+tokens.dat
+auth.json
+settings.json
