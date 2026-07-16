@@ -56,7 +56,7 @@ public static class L10n
         ["err_codex_missing"] = ("找不到或無法執行 Codex：{0}。請先安裝官方 Codex，或在設定中指定 codex.exe / codex.cmd。", "Codex couldn't be found or started: {0}. Install the official Codex CLI, or choose codex.exe / codex.cmd in Settings."),
         ["err_codex_path_invalid"] = ("設定的 Codex 路徑不存在：{0}", "The configured Codex path doesn't exist: {0}"),
         ["err_codex_stopped"] = ("Codex app-server 已停止，請稍後重試。", "Codex app-server stopped. Try again in a moment."),
-        ["err_chatgpt_not_signed_in"] = ("Codex 尚未使用 ChatGPT 帳號登入。右鍵選「連結 / 重新登入」。", "Codex isn't signed in with a ChatGPT account. Right-click and choose \"Connect / sign in again\"."),
+        ["err_chatgpt_not_signed_in"] = ("小工具的 Codex CLI 尚未獲得 ChatGPT 授權（不影響桌面版登入）。請右鍵選「連結 / 重新登入」完成一次授權。", "The widget's Codex CLI is not authorized with ChatGPT yet (your desktop app remains signed in). Right-click and choose \"Connect / sign in again\" once."),
         ["err_chatgpt_no_limits"] = ("OpenAI 目前沒有回傳可顯示的 Codex 用量額度。", "OpenAI didn't return any displayable Codex quota windows."),
         ["err_chatgpt_login_start"] = ("Codex 沒有回傳登入網址，請更新 Codex 後再試一次。", "Codex didn't return a sign-in URL. Update Codex and try again."),
         ["err_chatgpt_login_timeout"] = ("等待 ChatGPT 登入逾時，請再試一次。", "Timed out waiting for ChatGPT sign-in. Try again."),
@@ -106,7 +106,7 @@ public static class L10n
         ["settings_opacity_hint"] = ("0% 不透明,100% 完全透明", "0% solid — 100% fully transparent"),
         ["settings_codex_path"] = ("Codex 執行檔（選填）", "Codex executable (optional)"),
         ["settings_codex_browse"] = ("瀏覽…", "Browse…"),
-        ["settings_codex_hint"] = ("留空會自動搜尋 PATH；ChatGPT 用量由官方 Codex app-server 提供。", "Leave blank to search PATH. ChatGPT usage is provided by the official Codex app-server."),
+        ["settings_codex_hint"] = ("留空會自動搜尋 ChatGPT 桌面版與 PATH；ChatGPT 用量由官方 Codex app-server 提供。", "Leave blank to search the ChatGPT desktop app and PATH. ChatGPT usage is provided by the official Codex app-server."),
         // updater
         ["menu_check_update"] = ("檢查更新", "Check for updates"),
         ["update_title"] = ("軟體更新", "Software update"),
