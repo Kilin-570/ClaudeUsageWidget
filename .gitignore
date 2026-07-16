@@ -4,6 +4,7 @@ dist/
 *.user
 *.suo
 .vs/
+.sandbox-build/
 dist-release*/
 tests/mock-out/
 *.old
