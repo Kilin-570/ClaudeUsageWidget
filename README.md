@@ -33,16 +33,16 @@ The widget deliberately does not request or store an OpenAI API key. The public 
 
 ## Features
 
-- **Two providers, one widget** — switch between Claude and ChatGPT from the widget or tray menu
-- **Floating and always on top** — draggable, resizable, and remembers its position
-- **Compact mode** — collapse the widget to a one-line percentage summary
-- **Tray icon** — live percentage ring for the active provider
-- **Automatic refresh** — 60 s / 90 s / 2 min / 5 min; 90 s by default
-- **Reset countdowns** — updated locally between network refreshes
-- **Themes and language** — dark/light and Traditional Chinese/English
-- **Start with Windows** — Startup-folder shortcut with delayed launch
-- **Built-in updater** — checks this repository's GitHub Releases
-- **No telemetry** — no analytics, advertising, or third-party relay server
+- 🔀 **Two providers, one widget** — switch between Claude and ChatGPT from the widget or tray menu
+- 🪟 **Floating and always on top** — draggable, resizable, and remembers its position
+- 📐 **Compact mode** — collapse the widget to a one-line percentage summary
+- 🔔 **Tray icon** — live percentage ring for the active provider
+- 🔄 **Automatic refresh** — 60 s / 90 s / 2 min / 5 min; 90 s by default
+- ⏰ **Reset countdowns** — updated locally between network refreshes
+- 🎨 **Themes and language** — dark/light and Traditional Chinese/English
+- 🚀 **Start with Windows** — Startup-folder shortcut with delayed launch
+- ⬆️ **Built-in updater** — checks this repository's GitHub Releases
+- 🔒 **No telemetry** — no analytics, advertising, or third-party relay server
 
 ## Install
 
