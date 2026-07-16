@@ -20,6 +20,46 @@ var claude = UsageParser.Parse(claudePayload);
 Require(claude.Count == 3, "Claude limits array should produce three rows.");
 Require(claude[2].Label == "Weekly (Opus)", "Claude scoped model label wasn't preserved.");
 
+var fakeLocalAppData = Path.Combine(Path.GetTempPath(), "ClaudeUsageWidget.SmokeTests", Guid.NewGuid().ToString("N"));
+try
+{
+    var oldDirectory = Path.Combine(fakeLocalAppData, "OpenAI", "Codex", "bin", "old-version");
+    var currentDirectory = Path.Combine(fakeLocalAppData, "OpenAI", "Codex", "bin", "current-version");
+    Directory.CreateDirectory(oldDirectory);
+    Directory.CreateDirectory(currentDirectory);
+    var oldCodex = Path.Combine(oldDirectory, "codex.exe");
+    var currentCodex = Path.Combine(currentDirectory, "codex.exe");
+    File.WriteAllText(oldCodex, "old");
+    File.WriteAllText(currentCodex, "current");
+    File.SetLastWriteTimeUtc(oldCodex, DateTime.UtcNow.AddMinutes(-5));
+    File.SetLastWriteTimeUtc(currentCodex, DateTime.UtcNow);
+
+    var discovered = CodexLocator.FindChatGptDesktopCodex(fakeLocalAppData);
+    Require(
+        string.Equals(discovered, currentCodex, StringComparison.OrdinalIgnoreCase),
+        "ChatGPT desktop Codex discovery should select the newest installed candidate.");
+}
+finally
+{
+    if (Directory.Exists(fakeLocalAppData)) Directory.Delete(fakeLocalAppData, recursive: true);
+}
+
+if (args.Length == 1 && string.Equals(args[0], "--live", StringComparison.OrdinalIgnoreCase))
+{
+    using var liveService = new ChatGptUsageService(() => null);
+    var accountType = await liveService.GetAccountTypeAsync();
+    if (accountType is null)
+    {
+        Console.WriteLine("Live ChatGPT desktop Codex probe passed (app-server started; separate Codex CLI sign-in required).");
+        return;
+    }
+
+    var liveUsage = await liveService.GetUsageAsync();
+    Require(liveUsage.Count > 0, "The live Codex app-server returned no displayable quota windows.");
+    Console.WriteLine($"Live ChatGPT desktop Codex probe passed ({liveUsage.Count} quota windows; values withheld).");
+    return;
+}
+
 var mockPath = args.FirstOrDefault()
     ?? throw new ArgumentException("Pass the CodexAppServerMock executable path as the first argument.");
 using var service = new ChatGptUsageService(() => mockPath);
@@ -30,4 +70,4 @@ Require(chatGpt[0].Utilization == 25.0, "Primary ChatGPT utilization is incorrec
 Require(chatGpt[1].Label == "Weekly limit", "Secondary ChatGPT window label is incorrect.");
 Require(chatGpt[1].Utilization == 40.0, "Secondary ChatGPT utilization is incorrect.");
 
-Console.WriteLine("Smoke tests passed: Claude parser, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
+Console.WriteLine("Smoke tests passed: Claude parser, ChatGPT desktop Codex discovery, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
