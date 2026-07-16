@@ -274,6 +274,14 @@ static class CodexLocator
         if (!string.IsNullOrWhiteSpace(fromEnvironment) && File.Exists(fromEnvironment))
             return Path.GetFullPath(fromEnvironment);
 
+        // The unified ChatGPT desktop app keeps its runnable Codex CLI in a
+        // user-accessible, versioned directory. Prefer it over PATH because processes
+        // launched by ChatGPT can inherit a protected WindowsApps path that exists but
+        // cannot be started by an unpackaged widget.
+        var desktopBundled = FindChatGptDesktopCodex(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+        if (desktopBundled is not null) return desktopBundled;
+
         var path = Environment.GetEnvironmentVariable("PATH") ?? "";
         foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
@@ -293,6 +301,58 @@ static class CodexLocator
 
         // Let Windows resolve an App Execution Alias if one exists.
         return "codex.exe";
+    }
+
+    internal static string? FindChatGptDesktopCodex(string localApplicationData)
+    {
+        if (string.IsNullOrWhiteSpace(localApplicationData)) return null;
+
+        string binRoot;
+        try
+        {
+            binRoot = Path.Combine(localApplicationData, "OpenAI", "Codex", "bin");
+        }
+        catch
+        {
+            return null;
+        }
+
+        var candidates = new List<(string Path, DateTime LastWriteUtc)>();
+
+        void AddCandidate(string candidate)
+        {
+            try
+            {
+                if (!File.Exists(candidate)) return;
+                candidates.Add((Path.GetFullPath(candidate), File.GetLastWriteTimeUtc(candidate)));
+            }
+            catch
+            {
+                // An app update may be replacing a candidate while we enumerate it.
+            }
+        }
+
+        // Support both a future stable layout and today's one-level version/hash layout.
+        AddCandidate(Path.Combine(binRoot, "codex.exe"));
+        try
+        {
+            foreach (var versionDirectory in Directory.EnumerateDirectories(binRoot))
+                AddCandidate(Path.Combine(versionDirectory, "codex.exe"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return candidates
+                .OrderByDescending(candidate => candidate.LastWriteUtc)
+                .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(candidate => candidate.Path)
+                .FirstOrDefault();
+        }
+
+        return candidates
+            .OrderByDescending(candidate => candidate.LastWriteUtc)
+            .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(candidate => candidate.Path)
+            .FirstOrDefault();
     }
 
     public static ProcessStartInfo CreateAppServerStartInfo(string executable)

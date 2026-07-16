@@ -64,12 +64,12 @@ On first use, choose Claude and complete the browser sign-in. Claude tokens are 
 
 ### ChatGPT / Codex setup
 
-1. Install and sign in to the official [OpenAI Codex](https://github.com/openai/codex) CLI or desktop app.
+1. Install and sign in to the official ChatGPT desktop app (with Codex) or [OpenAI Codex CLI](https://github.com/openai/codex).
 2. Select **ChatGPT** in the widget.
-3. If needed, right-click and choose **Connect / sign in again**. The widget asks Codex to open the official ChatGPT login flow.
-4. If Codex is not found automatically, open **Settings** and choose `codex.exe`, `codex.cmd`, or `codex.bat`.
+3. If prompted, right-click and choose **Connect / sign in again** once. The unified desktop UI login may be separate from the independently launched Codex CLI authorization; the widget asks Codex to open the official ChatGPT login flow.
+4. The widget automatically detects both normal CLI installs and the Codex bundled with the unified ChatGPT desktop app. If detection still fails, open **Settings** and choose `codex.exe`, `codex.cmd`, or `codex.bat`.
 
-The widget communicates with a local Codex child process over redirected stdin/stdout. It never opens, parses, copies, or uploads Codex's `auth.json`.
+The widget communicates with a local Codex child process over redirected stdin/stdout. It never opens, parses, copies, or uploads Codex's `auth.json`, and this separate authorization does not sign the ChatGPT desktop app out.
 
 ## Build from source
 
@@ -93,6 +93,13 @@ dotnet run --project tests\ClaudeUsageWidget.SmokeTests\ClaudeUsageWidget.SmokeT
 ```
 
 The tests use a local mock app-server and contain no real account credentials or usage data.
+
+To verify automatic discovery against the signed-in ChatGPT desktop app without printing account details or usage values:
+
+```powershell
+dotnet run --project tests\ClaudeUsageWidget.SmokeTests\ClaudeUsageWidget.SmokeTests.csproj `
+  -c Release -- --live
+```
 
 ## Privacy and security
 

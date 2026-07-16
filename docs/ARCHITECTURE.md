@@ -43,7 +43,7 @@ The provider remains unofficial because Anthropic does not document the usage en
 
 ## ChatGPT / Codex flow
 
-1. `CodexLocator` finds a configured Codex executable, `CODEX_PATH`, or a PATH entry.
+1. `CodexLocator` checks a configured executable and `CODEX_PATH`, then the newest user-accessible Codex bundled with the unified ChatGPT desktop app, then normal PATH entries.
 2. `CodexAppServerClient` starts `codex app-server --stdio` with no shell for executables and a quoted command wrapper for `.cmd`/`.bat` installs.
 3. The client performs the documented `initialize` / `initialized` handshake.
 4. `account/read` checks whether Codex has ChatGPT-managed authentication.
@@ -58,6 +58,7 @@ The widget never reads Codex's auth file. Browser login is started through `acco
 - Provider results are cached independently so switching tabs can show the last successful value immediately.
 - Claude HTTP 429 responses use bounded exponential backoff.
 - A stopped Codex child process fails outstanding requests and is restarted on the next attempt.
+- ChatGPT desktop Codex discovery checks only the expected user-local directory and tolerates version directories being replaced during an app update.
 - Codex protocol output and stderr are deliberately not copied into widget logs.
 - Schema parsers ignore unknown fields and render only complete percentage windows.
 
