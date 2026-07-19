@@ -32,4 +32,3 @@ internal static class WindowPlacement
         return new Point(left, top);
     }
 }
-
