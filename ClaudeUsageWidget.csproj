@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ClaudeUsageWidget</AssemblyName>
     <RootNamespace>ClaudeUsageWidget</RootNamespace>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
   </PropertyGroup>
@@ -20,3 +20,4 @@
   </ItemGroup>
 
 </Project>
+
