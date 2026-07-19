@@ -7,6 +7,23 @@ static void Require(bool condition, string message)
 
 L10n.Init(UiLanguage.En);
 
+var primaryScreen = new System.Windows.Rect(0, 0, 1920, 1080);
+var strandedOnDisconnectedDisplay = new System.Windows.Rect(2200, 100, 320, 240);
+Require(
+    WindowPlacement.NeedsRecovery(strandedOnDisconnectedDisplay, primaryScreen),
+    "A window stranded on a disconnected display should be recovered.");
+
+var stillReachable = new System.Windows.Rect(1870, 100, 320, 240);
+Require(
+    !WindowPlacement.NeedsRecovery(stillReachable, primaryScreen),
+    "A window with a reachable strip should not be moved unexpectedly.");
+
+var dualScreenLayout = new System.Windows.Rect(-1280, 0, 3200, 1080);
+var visibleOnLeftDisplay = new System.Windows.Rect(-1100, 100, 320, 240);
+Require(
+    !WindowPlacement.NeedsRecovery(visibleOnLeftDisplay, dualScreenLayout),
+    "A window on an active left-side display should remain in place.");
+
 const string claudePayload = """
 {
   "limits": [
@@ -70,4 +87,5 @@ Require(chatGpt[0].Utilization == 25.0, "Primary ChatGPT utilization is incorrec
 Require(chatGpt[1].Label == "Weekly limit", "Secondary ChatGPT window label is incorrect.");
 Require(chatGpt[1].Utilization == 40.0, "Secondary ChatGPT utilization is incorrect.");
 
-Console.WriteLine("Smoke tests passed: Claude parser, ChatGPT desktop Codex discovery, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
+Console.WriteLine("Smoke tests passed: window placement recovery, Claude parser, ChatGPT desktop Codex discovery, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
+
