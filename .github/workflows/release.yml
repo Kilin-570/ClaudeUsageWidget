@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ClaudeUsageWidget.csproj
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content ClaudeUsageWidget.csproj
+          $version = $project.Project.PropertyGroup.Version
+          if (-not $version) { throw 'Project version is missing.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Reject an existing release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release view $env:TAG --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release $env:TAG already exists. Bump the project version before publishing."
+          }
+          $global:LASTEXITCODE = 0
+
+      - name: Build mock Codex app-server
+        shell: pwsh
+        run: dotnet publish tests/CodexAppServerMock/CodexAppServerMock.csproj -c Release -r win-x64 --self-contained false -o tests/mock-out
+
+      - name: Run smoke tests
+        shell: pwsh
+        run: dotnet run --project tests/ClaudeUsageWidget.SmokeTests/ClaudeUsageWidget.SmokeTests.csproj -c Release -- tests/mock-out/CodexAppServerMock.exe
+
+      - name: Publish self-contained widget
+        shell: pwsh
+        run: dotnet publish ClaudeUsageWidget.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist
+
+      - name: Package and hash release asset
+        shell: pwsh
+        run: |
+          $asset = 'ClaudeUsageWidget-win-x64.zip'
+          Compress-Archive -LiteralPath dist/ClaudeUsageWidget.exe -DestinationPath $asset
+          $hash = (Get-FileHash -Algorithm SHA256 $asset).Hash.ToLowerInvariant()
+          "$hash  $asset" | Set-Content -Encoding ascii SHA256SUMS.txt
+
+      - name: Create tag and public release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          $tagCommit = git rev-list -n 1 $env:TAG 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if ($tagCommit -ne $env:GITHUB_SHA) {
+              throw "Existing tag $env:TAG does not point to the current release commit."
+            }
+          } else {
+            $global:LASTEXITCODE = 0
+            git tag -a $env:TAG -m "Release $env:TAG"
+            git push origin $env:TAG
+          }
+          gh release create $env:TAG ClaudeUsageWidget-win-x64.zip SHA256SUMS.txt `
+            --repo $env:GITHUB_REPOSITORY `
+            --title "AI Usage Widget $env:TAG" `
+            --generate-notes `
+            --verify-tag
+
