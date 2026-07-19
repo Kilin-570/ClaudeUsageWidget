@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Color = System.Windows.Media.Color;
 using Cursor = System.Windows.Input.Cursor;
 using Cursors = System.Windows.Input.Cursors;
@@ -9,6 +11,7 @@ using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
 using Rectangle = System.Windows.Shapes.Rectangle;
+using Size = System.Windows.Size;
 
 namespace ClaudeUsageWidget;
 
@@ -18,6 +21,9 @@ public partial class MainWindow : Window
     List<UsageBucket> _lastBuckets = new();
     bool _hasError;
     UsageProviderKind _activeProvider;
+    HwndSource? _windowSource;
+
+    const int WmDisplayChange = 0x007E;
 
     public event Action? RefreshRequested;
     public event Action? ReloginRequested;
@@ -60,6 +66,78 @@ public partial class MainWindow : Window
         };
 
         Loaded += (_, _) => AutoStartMenuItem.IsChecked = AutoStart.IsEnabled();
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        _windowSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+        _windowSource?.AddHook(WindowMessageHook);
+
+        // SizeToContent has not finalized ActualWidth/ActualHeight until layout runs.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, EnsureVisibleOnCurrentDisplays);
+    }
+
+    IntPtr WindowMessageHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmDisplayChange)
+        {
+            // Defer until Windows has updated its virtual-screen metrics. This catches
+            // virtual displays (such as spacedesk) being disconnected while the app runs.
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, EnsureVisibleOnCurrentDisplays);
+        }
+
+        return IntPtr.Zero;
+    }
+
+    public bool EnsureVisibleOnCurrentDisplays()
+    {
+        UpdateLayout();
+        var size = CurrentWindowSize();
+        var virtualScreen = new Rect(
+            SystemParameters.VirtualScreenLeft,
+            SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth,
+            SystemParameters.VirtualScreenHeight);
+        var currentBounds = new Rect(Left, Top, size.Width, size.Height);
+
+        if (!WindowPlacement.NeedsRecovery(currentBounds, virtualScreen))
+            return false;
+
+        MoveToPrimaryScreen(size, "window was outside the active display area");
+        return true;
+    }
+
+    public void ResetPositionToPrimaryScreen() =>
+        MoveToPrimaryScreen(CurrentWindowSize(), "position reset requested");
+
+    Size CurrentWindowSize()
+    {
+        var width = double.IsFinite(ActualWidth) && ActualWidth > 0
+            ? ActualWidth
+            : 250 * _settings.UiScale;
+        var height = double.IsFinite(ActualHeight) && ActualHeight > 0
+            ? ActualHeight
+            : 180 * _settings.UiScale;
+        return new Size(width, height);
+    }
+
+    void MoveToPrimaryScreen(Size size, string reason)
+    {
+        var target = WindowPlacement.TopRightOf(SystemParameters.WorkArea, size);
+        Left = target.X;
+        Top = target.Y;
+        _settings.WindowLeft = Left;
+        _settings.WindowTop = Top;
+        _settings.Save();
+        Log.Write($"Window moved to primary display ({reason}): left={Left:F1}, top={Top:F1}");
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _windowSource?.RemoveHook(WindowMessageHook);
+        _windowSource = null;
+        base.OnClosed(e);
     }
 
     // ---------- move & edge-resize ----------

@@ -43,6 +43,7 @@ public static class L10n
         ["menu_autostart"] = ("開機自動啟動", "Start with Windows"),
         ["menu_relogin"] = ("連結 / 重新登入", "Connect / sign in again"),
         ["menu_exit"] = ("結束", "Exit"),
+        ["menu_reset_position"] = ("重設視窗位置", "Reset window position"),
         // errors / status
         ["err_update_prefix"] = ("更新失敗:{0}", "Update failed: {0}"),
         ["err_not_signed_in_hint"] = ("尚未登入，右鍵選「連結 / 重新登入」。", "Not signed in — right-click and choose \"Connect / sign in again\"."),
