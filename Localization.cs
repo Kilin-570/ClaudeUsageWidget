@@ -123,4 +123,3 @@ public static class L10n
         ["interval_300"] = ("每 5 分鐘", "Every 5 min"),
     };
 }
-
