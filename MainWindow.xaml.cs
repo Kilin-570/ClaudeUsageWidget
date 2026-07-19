@@ -577,4 +577,3 @@ public partial class MainWindow : Window
         HideRequested?.Invoke();
     }
 }
-
