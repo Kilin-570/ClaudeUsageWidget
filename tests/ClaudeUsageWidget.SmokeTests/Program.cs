@@ -88,4 +88,3 @@ Require(chatGpt[1].Label == "Weekly limit", "Secondary ChatGPT window label is i
 Require(chatGpt[1].Utilization == 40.0, "Secondary ChatGPT utilization is incorrect.");
 
 Console.WriteLine("Smoke tests passed: window placement recovery, Claude parser, ChatGPT desktop Codex discovery, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
-
