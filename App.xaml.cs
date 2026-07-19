@@ -187,6 +187,7 @@ public partial class App : System.Windows.Application
     // ---------- tray ----------
 
     WinForms.ToolStripMenuItem _trayShowHide = null!;
+    WinForms.ToolStripMenuItem _trayResetPosition = null!;
     WinForms.ToolStripMenuItem _trayRefresh = null!;
     WinForms.ToolStripMenuItem _trayProvider = null!;
     WinForms.ToolStripMenuItem _trayClaude = null!;
@@ -211,6 +212,7 @@ public partial class App : System.Windows.Application
 
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add(_trayShowHide = new WinForms.ToolStripMenuItem("", null, (_, _) => ToggleWidget()));
+        menu.Items.Add(_trayResetPosition = new WinForms.ToolStripMenuItem("", null, (_, _) => ResetWidgetPosition()));
         menu.Items.Add(_trayRefresh = new WinForms.ToolStripMenuItem("", null, (_, _) => _ = FetchAndRenderAsync()));
         _trayProvider = new WinForms.ToolStripMenuItem();
         _trayProvider.DropDownItems.Add(_trayClaude = new WinForms.ToolStripMenuItem("Claude", null,
@@ -233,6 +235,7 @@ public partial class App : System.Windows.Application
     void ApplyTrayLanguage()
     {
         _trayShowHide.Text = L10n.T("menu_showhide");
+        _trayResetPosition.Text = L10n.T("menu_reset_position");
         _trayRefresh.Text = L10n.T("menu_refresh");
         _trayProvider.Text = L10n.T("menu_provider");
         _trayClaude.Text = L10n.T("provider_claude");
@@ -296,6 +299,15 @@ public partial class App : System.Windows.Application
         _settings.WidgetVisible = false;
         _settings.Save();
         _widget.Hide();
+    }
+
+    void ResetWidgetPosition()
+    {
+        _settings.WidgetVisible = true;
+        _settings.Save();
+        if (!_widget.IsVisible) _widget.Show();
+        _widget.ResetPositionToPrimaryScreen();
+        _widget.Activate();
     }
 
     void ExitApp()
@@ -488,3 +500,4 @@ public partial class App : System.Windows.Application
         }
     }
 }
+
