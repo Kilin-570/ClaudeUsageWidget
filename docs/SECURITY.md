@@ -42,7 +42,9 @@ The widget deliberately delegates authentication to OpenAI Codex:
 
 ## Update boundary
 
-The updater downloads the asset named `ClaudeUsageWidget-win-x64.zip` from this repository's latest GitHub Release. Releases are not currently code-signed, so users who require stronger supply-chain assurance should build from a reviewed commit.
+GitHub Actions builds the release commit, runs the local mock app-server smoke tests, and publishes `ClaudeUsageWidget-win-x64.zip` together with `SHA256SUMS.txt`.
+
+The updater downloads the asset named `ClaudeUsageWidget-win-x64.zip` from this repository's latest GitHub Release. It does not yet validate `SHA256SUMS.txt` or a code signature before applying the update. Releases are not currently code-signed, so users who require stronger supply-chain assurance should build from a reviewed commit and verify the published checksum manually.
 
 ## Reporting a security issue
 

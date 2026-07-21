@@ -22,7 +22,7 @@ A small, open-source Windows desktop widget for checking **Claude plan usage** a
 - Primary quota window, normally the 5-hour limit
 - Secondary quota window, normally the weekly limit
 - Reset countdown for each window
-- Data obtained through OpenAI's official, stable [`codex app-server` account API](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md#auth-endpoints)
+- Data obtained through OpenAI's official [`codex app-server` local interface](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md#auth-endpoints). This interface may evolve with Codex.
 
 The widget deliberately does not request or store an OpenAI API key. The public [OpenAI Usage API](https://platform.openai.com/docs/api-reference/usage) reports API organization activity and requires an organization admin key; that is not the same as a personal ChatGPT/Codex allowance.
 
@@ -100,7 +100,7 @@ dotnet run --project tests\ClaudeUsageWidget.SmokeTests\ClaudeUsageWidget.SmokeT
 - **ChatGPT:** the widget stores no ChatGPT token and does not read Codex credential files. Codex owns the browser login, token storage, refresh, and OpenAI request.
 - **Network:** the widget has no developer-operated backend and sends no telemetry. Claude usage is read from Anthropic; ChatGPT/Codex usage is requested through the local official Codex process; update checks go to GitHub Releases.
 - **Logs:** Codex app-server stdout/stderr is not copied into widget logs, reducing the chance of local account metadata appearing in diagnostics.
-- **Repository hygiene:** credential-shaped local files and signing keys are ignored. Release builds are scanned before publishing.
+- **Repository hygiene:** credential-shaped local files and signing keys are ignored. GitHub Actions builds and smoke-tests release commits; each release includes `SHA256SUMS.txt` for manual download verification.
 
 See [Security design](docs/SECURITY.md) and [Architecture](docs/ARCHITECTURE.md) for the complete boundaries and trade-offs.
 
