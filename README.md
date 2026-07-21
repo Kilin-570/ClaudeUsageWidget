@@ -4,11 +4,6 @@ A small, open-source Windows desktop widget for checking **Claude plan usage** a
 
 一個小巧的 Windows 桌面用量工具，可在同一個小工具中切換查看 **Claude 方案用量**與 **ChatGPT 帳號下的 Codex 額度**。
 
-> [!IMPORTANT]
-> The ChatGPT tab shows the quota windows returned by OpenAI Codex, such as the 5-hour and weekly limits. It does **not** claim to show every model-specific message limit from normal ChatGPT conversations. OpenAI's public Usage API is for API organization activity and is a separate product surface.
->
-> ChatGPT 分頁顯示 OpenAI Codex 回傳的 5 小時、每週等額度；它**不代表**一般 ChatGPT 對話中所有模型的訊息上限。OpenAI 公開的 Usage API 是 API 組織用量，兩者是不同產品範圍。
-
 | ChatGPT usage | Claude usage |
 | :---: | :---: |
 | ![ChatGPT usage](docs/ChatGPT.png) | ![Claude usage](docs/Claude.png) |
