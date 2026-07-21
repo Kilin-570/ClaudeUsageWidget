@@ -84,6 +84,15 @@
                         Style="{StaticResource ProviderButtonStyle}"
                         Click="OnChatGptProviderClick"/>
             </Grid>
+            <StackPanel x:Name="UpdateProgressPanel" Visibility="Collapsed" Margin="0,0,0,5">
+                <DockPanel Margin="0,0,0,3">
+                    <Button x:Name="CancelUpdateButton" DockPanel.Dock="Right" Padding="5,1"
+                            FontSize="9" Content="Cancel" Click="OnCancelUpdateClick"/>
+                    <TextBlock x:Name="UpdateProgressText" FontSize="10"
+                               Foreground="#FF8A8A96" VerticalAlignment="Center"/>
+                </DockPanel>
+                <ProgressBar x:Name="UpdateProgressBar" Height="4" Minimum="0" Maximum="100"/>
+            </StackPanel>
             <StackPanel x:Name="RowsPanel"/>
             <TextBlock x:Name="ErrorText" Foreground="#FFFF9E80" FontSize="11"
                        TextWrapping="Wrap" MaxWidth="220" Visibility="Collapsed" Margin="0,4,0,0"/>

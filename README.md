@@ -106,7 +106,7 @@ See [Security design](docs/SECURITY.md) and [Architecture](docs/ARCHITECTURE.md)
 
 ## Updating
 
-From v1.4.0 onward, right-click the widget and choose **Check for updates**. To update manually, exit the app and overwrite the old executable. Tokens and settings remain under `%APPDATA%\ClaudeUsageWidget`, so replacing the executable does not remove them.
+From v1.4.0 onward, right-click the widget and choose **Check for updates**. The built-in updater shows actual download progress when the server provides a file size, verifies the published SHA-256 checksum before extracting the update, and only allows cancellation during downloading. Tokens and settings remain under `%APPDATA%\ClaudeUsageWidget`, so replacing the executable does not remove them.
 
 ## Uninstall
 

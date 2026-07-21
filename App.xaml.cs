@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using System.Security.Principal;
 using MessageBox = System.Windows.MessageBox;
 using WinForms = System.Windows.Forms;
 
@@ -19,10 +20,20 @@ public partial class App : System.Windows.Application
     DispatcherTimer _fetchTimer = null!;
     DispatcherTimer _countdownTimer = null!;
     bool _loginWindowOpen;
+    Mutex? _singleInstanceMutex;
+    EventWaitHandle? _activationSignal;
+    RegisteredWaitHandle? _activationWait;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        if (!TryAcquireSingleInstance())
+        {
+            SignalExistingInstance();
+            Shutdown();
+            return;
+        }
 
         Log.Write($"=== 啟動 v{typeof(App).Assembly.GetName().Version} pid={Environment.ProcessId} args=[{string.Join(' ', e.Args)}] path={Environment.ProcessPath}");
         if (AppPaths.ResolutionNote.Length > 0)
@@ -49,6 +60,7 @@ public partial class App : System.Windows.Application
         try
         {
             StartupCore();
+            StartActivationListener();
             Log.Write("啟動完成");
         }
         catch (Exception ex)
@@ -56,6 +68,65 @@ public partial class App : System.Windows.Application
             Log.Error("啟動失敗", ex);
             throw;
         }
+    }
+
+    static string InstanceName(string purpose)
+    {
+        var sid = WindowsIdentity.GetCurrent().User?.Value ?? Environment.UserName;
+        return $"Local\\ClaudeUsageWidget-{purpose}-{sid}";
+    }
+
+    bool TryAcquireSingleInstance()
+    {
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, InstanceName("instance"), out var createdNew);
+        if (createdNew)
+        {
+            _activationSignal = new EventWaitHandle(false, EventResetMode.AutoReset, InstanceName("activate"));
+            return true;
+        }
+
+        _singleInstanceMutex.Dispose();
+        _singleInstanceMutex = null;
+        return false;
+    }
+
+    static void SignalExistingInstance()
+    {
+        // The first copy creates the event immediately after the mutex. A short retry
+        // handles a second launch during that tiny startup window without polling later.
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            try
+            {
+                using var signal = EventWaitHandle.OpenExisting(InstanceName("activate"));
+                signal.Set();
+                return;
+            }
+            catch (WaitHandleCannotBeOpenedException)
+            {
+                Thread.Sleep(50);
+            }
+        }
+    }
+
+    void StartActivationListener()
+    {
+        if (_activationSignal is null) return;
+        _activationWait = ThreadPool.RegisterWaitForSingleObject(
+            _activationSignal,
+            (_, _) => Dispatcher.BeginInvoke(ShowExistingInstance),
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
+    }
+
+    void ShowExistingInstance()
+    {
+        _settings.WidgetVisible = true;
+        _settings.Save();
+        if (!_widget.IsVisible) _widget.Show();
+        _widget.EnsureVisibleOnCurrentDisplays();
+        _widget.Activate();
     }
 
     void StartupCore()
@@ -92,6 +163,7 @@ public partial class App : System.Windows.Application
         _widget.ExitRequested += ExitApp;
         _widget.SettingsRequested += ShowSettings;
         _widget.UpdateCheckRequested += () => _ = CheckForUpdatesAsync(interactive: true);
+        _widget.CancelUpdateRequested += CancelPendingUpdate;
 
         UpdateService.CleanupOldBinary();
         SetupTray();
@@ -123,6 +195,8 @@ public partial class App : System.Windows.Application
 
     UpdateInfo? _pendingUpdate;
     bool _updating;
+    bool _downloadCanBeCancelled;
+    CancellationTokenSource? _updateCancellation;
 
     async Task AutoCheckUpdatesAsync()
     {
@@ -167,9 +241,20 @@ public partial class App : System.Windows.Application
                 L10n.T("update_title"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (answer != MessageBoxResult.Yes) return;
 
-            _widget.ShowNotice(L10n.T("update_downloading"));
-            await UpdateService.DownloadAndApplyAsync(info);
-            ExitApp();
+            _settings.WidgetVisible = true;
+            _settings.Save();
+            if (!_widget.IsVisible) _widget.Show();
+            _widget.Activate();
+
+            _updateCancellation = new CancellationTokenSource();
+            var progress = new Progress<UpdateProgress>(ShowUpdateProgress);
+            await UpdateService.DownloadAndApplyAsync(info, progress, _updateCancellation.Token);
+            ExitAfterUpdate();
+        }
+        catch (OperationCanceledException) when (_updateCancellation?.IsCancellationRequested == true)
+        {
+            Log.Write("使用者取消更新下載");
+            _widget.ShowNotice(L10n.T("update_cancelled"));
         }
         catch (Exception ex)
         {
@@ -180,8 +265,58 @@ public partial class App : System.Windows.Application
         }
         finally
         {
+            _downloadCanBeCancelled = false;
+            SetUpdateCancellationEnabled(false);
+            _updateCancellation?.Dispose();
+            _updateCancellation = null;
+            _widget?.HideUpdateProgress();
             _updating = false;
         }
+    }
+
+    void ShowUpdateProgress(UpdateProgress progress)
+    {
+        _downloadCanBeCancelled = progress.Stage == UpdateStage.Downloading;
+        SetUpdateCancellationEnabled(_downloadCanBeCancelled);
+
+        string message;
+        double? percent = null;
+        switch (progress.Stage)
+        {
+            case UpdateStage.Downloading when progress.TotalBytes is long total && total > 0:
+                percent = progress.CompletedBytes * 100.0 / total;
+                message = L10n.F(
+                    "update_download_progress",
+                    Math.Clamp((int)Math.Round(percent.Value), 0, 100),
+                    (progress.CompletedBytes / 1024d / 1024d).ToString("0.0"),
+                    (total / 1024d / 1024d).ToString("0.0"));
+                break;
+            case UpdateStage.Downloading:
+                message = L10n.T("update_download_unknown");
+                break;
+            case UpdateStage.Verifying:
+                message = L10n.T("update_verifying");
+                if (progress.TotalBytes is long verifyTotal && verifyTotal > 0)
+                    percent = progress.CompletedBytes * 100.0 / verifyTotal;
+                break;
+            case UpdateStage.Extracting:
+                message = L10n.T("update_extracting");
+                break;
+            case UpdateStage.Applying:
+                message = L10n.T("update_applying");
+                break;
+            default:
+                message = L10n.T("update_restarting");
+                break;
+        }
+
+        _widget.ShowUpdateProgress(message, percent, _downloadCanBeCancelled);
+    }
+
+    void CancelPendingUpdate()
+    {
+        if (_updating && _downloadCanBeCancelled)
+            _updateCancellation?.Cancel();
     }
 
     // ---------- tray ----------
@@ -194,6 +329,7 @@ public partial class App : System.Windows.Application
     WinForms.ToolStripMenuItem _trayChatGpt = null!;
     WinForms.ToolStripMenuItem _traySettings = null!;
     WinForms.ToolStripMenuItem _trayUpdate = null!;
+    WinForms.ToolStripMenuItem _trayCancelUpdate = null!;
     WinForms.ToolStripMenuItem _trayRelogin = null!;
     WinForms.ToolStripMenuItem _trayExit = null!;
 
@@ -222,6 +358,11 @@ public partial class App : System.Windows.Application
         menu.Items.Add(_trayProvider);
         menu.Items.Add(_traySettings = new WinForms.ToolStripMenuItem("", null, (_, _) => ShowSettings()));
         menu.Items.Add(_trayUpdate = new WinForms.ToolStripMenuItem("", null, (_, _) => _ = CheckForUpdatesAsync(interactive: true)));
+        menu.Items.Add(_trayCancelUpdate = new WinForms.ToolStripMenuItem("", null, (_, _) => CancelPendingUpdate())
+        {
+            Enabled = false,
+            Visible = false,
+        });
         menu.Items.Add(_trayRelogin = new WinForms.ToolStripMenuItem("", null, (_, _) => _ = ConnectCurrentProviderAsync(force: true)));
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(_trayExit = new WinForms.ToolStripMenuItem("", null, (_, _) => ExitApp()));
@@ -242,6 +383,7 @@ public partial class App : System.Windows.Application
         _trayChatGpt.Text = L10n.T("provider_chatgpt");
         _traySettings.Text = L10n.T("menu_settings");
         _trayUpdate.Text = L10n.T("menu_check_update");
+        _trayCancelUpdate.Text = L10n.T("update_cancel");
         _trayRelogin.Text = L10n.T("menu_relogin");
         _trayExit.Text = L10n.T("menu_exit");
     }
@@ -301,6 +443,13 @@ public partial class App : System.Windows.Application
         _widget.Hide();
     }
 
+    void SetUpdateCancellationEnabled(bool enabled)
+    {
+        if (_trayCancelUpdate is null) return;
+        _trayCancelUpdate.Visible = enabled;
+        _trayCancelUpdate.Enabled = enabled;
+    }
+
     void ResetWidgetPosition()
     {
         _settings.WidgetVisible = true;
@@ -312,12 +461,40 @@ public partial class App : System.Windows.Application
 
     void ExitApp()
     {
+        if (_updating)
+        {
+            CancelPendingUpdate();
+            return;
+        }
+        ExitAppCore();
+    }
+
+    void ExitAfterUpdate() => ExitAppCore();
+
+    void ExitAppCore()
+    {
         Log.Write("使用者選擇結束");
         _chatGptService?.Dispose();
         _chatGptService = null;
         _tray.Visible = false;
         _tray.Dispose();
         Shutdown();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _activationWait?.Unregister(null);
+        _activationWait = null;
+        _activationSignal?.Dispose();
+        _activationSignal = null;
+        if (_singleInstanceMutex is not null)
+        {
+            try { _singleInstanceMutex.ReleaseMutex(); }
+            catch (ApplicationException) { /* another shutdown path already released it */ }
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+        }
+        base.OnExit(e);
     }
 
     // ---------- providers and data flow ----------

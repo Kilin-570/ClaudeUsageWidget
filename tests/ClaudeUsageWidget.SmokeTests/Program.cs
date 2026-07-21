@@ -7,6 +7,19 @@ static void Require(bool condition, string message)
 
 L10n.Init(UiLanguage.En);
 
+const string updateZip = "ClaudeUsageWidget-win-x64.zip";
+const string expectedUpdateHash = "e68928a80d0cf0ba34c93c249794587ac833617bcdbbe2034bd61db23262e0e9";
+Require(
+    UpdateService.ParseExpectedHash($"{expectedUpdateHash}  {updateZip}\n", updateZip) == expectedUpdateHash,
+    "The release checksum parser should select the expected zip asset.");
+var missingChecksumWasRejected = false;
+try
+{
+    UpdateService.ParseExpectedHash($"{expectedUpdateHash}  another-file.zip\n", updateZip);
+}
+catch (InvalidOperationException) { missingChecksumWasRejected = true; }
+Require(missingChecksumWasRejected, "A missing update checksum should be rejected.");
+
 var primaryScreen = new System.Windows.Rect(0, 0, 1920, 1080);
 var strandedOnDisconnectedDisplay = new System.Windows.Rect(2200, 100, 320, 240);
 Require(

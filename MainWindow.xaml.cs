@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     readonly Settings _settings;
     List<UsageBucket> _lastBuckets = new();
     bool _hasError;
+    bool _showingUpdateProgress;
     UsageProviderKind _activeProvider;
     HwndSource? _windowSource;
 
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
     public event Action? ExitRequested;
     public event Action? SettingsRequested;
     public event Action? UpdateCheckRequested;
+    public event Action? CancelUpdateRequested;
     public event Action<UsageProviderKind>? ProviderChanged;
 
     public UsageProviderKind ActiveProvider => _activeProvider;
@@ -269,6 +271,7 @@ public partial class MainWindow : Window
     void OnExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke();
     void OnSettingsClick(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
     void OnCheckUpdateClick(object sender, RoutedEventArgs e) => UpdateCheckRequested?.Invoke();
+    void OnCancelUpdateClick(object sender, RoutedEventArgs e) => CancelUpdateRequested?.Invoke();
     void OnClaudeProviderClick(object sender, RoutedEventArgs e) => SelectProvider(UsageProviderKind.Claude);
     void OnChatGptProviderClick(object sender, RoutedEventArgs e) => SelectProvider(UsageProviderKind.ChatGpt);
 
@@ -322,6 +325,25 @@ public partial class MainWindow : Window
         ApplyCollapsedState();
     }
 
+    public void ShowUpdateProgress(string message, double? percent, bool canCancel)
+    {
+        _hasError = false;
+        _showingUpdateProgress = true;
+        UpdateProgressText.Text = message;
+        CancelUpdateButton.Content = L10n.T("update_cancel");
+        CancelUpdateButton.IsEnabled = canCancel;
+        UpdateProgressBar.IsIndeterminate = percent is null;
+        if (percent is double value) UpdateProgressBar.Value = Math.Clamp(value, 0, 100);
+        ApplyCollapsedState();
+    }
+
+    public void HideUpdateProgress()
+    {
+        _showingUpdateProgress = false;
+        UpdateProgressBar.IsIndeterminate = false;
+        ApplyCollapsedState();
+    }
+
     public void ShowUsage(List<UsageBucket> buckets)
     {
         _lastBuckets = buckets;
@@ -359,6 +381,9 @@ public partial class MainWindow : Window
         ProviderPanel.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
         CompactText.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
         ErrorText.Visibility = !collapsed && _hasError ? Visibility.Visible : Visibility.Collapsed;
+        UpdateProgressPanel.Visibility = _showingUpdateProgress
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         if (collapsed) RebuildCompact();
     }
 
@@ -413,6 +438,7 @@ public partial class MainWindow : Window
         CheckUpdateMenuItem.Header = L10n.T("menu_check_update");
         ReloginMenuItem.Header = L10n.T("menu_relogin");
         ExitMenuItem.Header = L10n.T("menu_exit");
+        CancelUpdateButton.Content = L10n.T("update_cancel");
 
         ClaudeProviderButton.Content = L10n.T("provider_claude");
         ChatGptProviderButton.Content = L10n.T("provider_chatgpt");
