@@ -10,6 +10,8 @@ public partial class App : System.Windows.Application
 {
     readonly UsageService _claudeService = new();
     readonly Dictionary<UsageProviderKind, List<UsageBucket>> _cache = new();
+    readonly Dictionary<UsageProviderKind, DateTimeOffset> _lastSuccessAt = new();
+    readonly Dictionary<UsageProviderKind, string> _providerStatus = new();
     readonly SemaphoreSlim _fetchGate = new(1, 1);
 
     ChatGptUsageService? _chatGptService;
@@ -132,6 +134,7 @@ public partial class App : System.Windows.Application
     void StartupCore()
     {
         _settings = Settings.Load();
+        string? autoStartNotice = null;
 
         L10n.Init(_settings.Language switch
         {
@@ -146,13 +149,19 @@ public partial class App : System.Windows.Application
 
         if (!_settings.FirstRunDone)
         {
-            AutoStart.Enable();
+            var result = AutoStart.TryEnable();
+            if (!result.Succeeded || result.Detail is not null)
+                autoStartNotice = result.Detail ?? "UnknownFailure";
             _settings.FirstRunDone = true;
             _settings.Save();
         }
         else if (AutoStart.IsEnabled())
         {
-            AutoStart.Enable();
+            var result = AutoStart.TryEnable();
+            if (!result.Succeeded)
+                autoStartNotice = result.Detail ?? "UnknownFailure";
+            else if (result.Detail is not null)
+                Log.Write($"Auto-start shortcut is active; legacy registry cleanup warning: {result.Detail}");
         }
 
         _widget = new MainWindow(_settings);
@@ -162,11 +171,21 @@ public partial class App : System.Windows.Application
         _widget.HideRequested += HideWidget;
         _widget.ExitRequested += ExitApp;
         _widget.SettingsRequested += ShowSettings;
+        _widget.DiagnosticsRequested += CopyDiagnostics;
         _widget.UpdateCheckRequested += () => _ = CheckForUpdatesAsync(interactive: true);
         _widget.CancelUpdateRequested += CancelPendingUpdate;
 
         UpdateService.CleanupOldBinary();
+        UpdateService.CleanupStaleTemporaryDirectories();
         SetupTray();
+        if (autoStartNotice is not null)
+        {
+            _tray.ShowBalloonTip(
+                8000,
+                "AI Usage Widget",
+                L10n.F("autostart_problem", autoStartNotice),
+                WinForms.ToolTipIcon.Warning);
+        }
         if (_settings.WidgetVisible) _widget.Show();
 
         _backoffSec = BaseIntervalSec;
@@ -328,6 +347,7 @@ public partial class App : System.Windows.Application
     WinForms.ToolStripMenuItem _trayClaude = null!;
     WinForms.ToolStripMenuItem _trayChatGpt = null!;
     WinForms.ToolStripMenuItem _traySettings = null!;
+    WinForms.ToolStripMenuItem _trayDiagnostics = null!;
     WinForms.ToolStripMenuItem _trayUpdate = null!;
     WinForms.ToolStripMenuItem _trayCancelUpdate = null!;
     WinForms.ToolStripMenuItem _trayRelogin = null!;
@@ -357,6 +377,7 @@ public partial class App : System.Windows.Application
             (_, _) => _ = ActivateProviderAsync(UsageProviderKind.ChatGpt)));
         menu.Items.Add(_trayProvider);
         menu.Items.Add(_traySettings = new WinForms.ToolStripMenuItem("", null, (_, _) => ShowSettings()));
+        menu.Items.Add(_trayDiagnostics = new WinForms.ToolStripMenuItem("", null, (_, _) => CopyDiagnostics()));
         menu.Items.Add(_trayUpdate = new WinForms.ToolStripMenuItem("", null, (_, _) => _ = CheckForUpdatesAsync(interactive: true)));
         menu.Items.Add(_trayCancelUpdate = new WinForms.ToolStripMenuItem("", null, (_, _) => CancelPendingUpdate())
         {
@@ -382,6 +403,7 @@ public partial class App : System.Windows.Application
         _trayClaude.Text = L10n.T("provider_claude");
         _trayChatGpt.Text = L10n.T("provider_chatgpt");
         _traySettings.Text = L10n.T("menu_settings");
+        _trayDiagnostics.Text = L10n.T("menu_copy_diagnostics");
         _trayUpdate.Text = L10n.T("menu_check_update");
         _trayCancelUpdate.Text = L10n.T("update_cancel");
         _trayRelogin.Text = L10n.T("menu_relogin");
@@ -406,6 +428,38 @@ public partial class App : System.Windows.Application
         }
         _settingsWindow = new SettingsWindow(_settings, ApplySettingsChanges);
         _settingsWindow.Show();
+    }
+
+    void CopyDiagnostics()
+    {
+        try
+        {
+            var providers = Enum.GetValues<UsageProviderKind>()
+                .Select(provider => new ProviderDiagnostic(
+                    provider,
+                    _lastSuccessAt.TryGetValue(provider, out var timestamp) ? timestamp : null,
+                    _providerStatus.GetValueOrDefault(provider, "NotChecked")));
+            var report = DiagnosticsService.BuildReport(
+                typeof(App).Assembly.GetName().Version ?? new Version(0, 0, 0),
+                _widget.ActiveProvider,
+                providers,
+                DiagnosticsService.InspectCodex(_settings.CodexExecutablePath));
+            System.Windows.Clipboard.SetText(report);
+            _tray.ShowBalloonTip(
+                3500,
+                "AI Usage Widget",
+                L10n.T("diagnostics_copied"),
+                WinForms.ToolTipIcon.Info);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Copy diagnostics failed", ex);
+            MessageBox.Show(
+                L10n.F("diagnostics_copy_failed", ex.GetType().Name),
+                "AI Usage Widget",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     void ApplySettingsChanges()
@@ -526,7 +580,9 @@ public partial class App : System.Windows.Application
         _fetchTimer.Interval = TimeSpan.FromSeconds(BaseIntervalSec);
 
         if (_cache.TryGetValue(provider, out var cached))
-            _widget.ShowUsage(cached);
+            _widget.ShowUsage(
+                cached,
+                _lastSuccessAt.TryGetValue(provider, out var cachedAt) ? cachedAt : null);
         else
             _widget.ShowLoading(L10n.T("updating"));
         await FetchAndRenderAsync();
@@ -540,6 +596,7 @@ public partial class App : System.Windows.Application
         {
             if (provider == UsageProviderKind.Claude && !_claudeService.HasTokens)
             {
+                _providerStatus[provider] = "AuthenticationRequired";
                 if (_widget.ActiveProvider == provider)
                     _widget.ShowError(L10n.T("err_not_signed_in_hint"));
                 return;
@@ -551,9 +608,12 @@ public partial class App : System.Windows.Application
                 : await GetChatGptService().GetUsageAsync();
 
             _cache[provider] = buckets;
+            var refreshedAt = DateTimeOffset.Now;
+            _lastSuccessAt[provider] = refreshedAt;
+            _providerStatus[provider] = "Ready";
             if (_widget.ActiveProvider == provider)
             {
-                _widget.ShowUsage(buckets);
+                _widget.ShowUsage(buckets, refreshedAt);
                 UpdateTray(provider, buckets);
             }
             if (_backoffSec != BaseIntervalSec)
@@ -564,6 +624,7 @@ public partial class App : System.Windows.Application
         }
         catch (RateLimitedException ex)
         {
+            _providerStatus[provider] = "RateLimited";
             _backoffSec = Math.Min(600, _backoffSec * 2);
             var waitSec = ex.RetryAfter?.TotalSeconds is double retryAfter && retryAfter > 0
                 ? Math.Clamp(retryAfter, BaseIntervalSec, 600)
@@ -571,18 +632,36 @@ public partial class App : System.Windows.Application
             _fetchTimer.Interval = TimeSpan.FromSeconds(waitSec);
             Log.Write($"usage API 限流 (429)，{waitSec:F0} 秒後重試");
             if (_widget.ActiveProvider == provider)
-                _widget.ShowNotice(L10n.F("retry_at", DateTime.Now.AddSeconds(waitSec).ToString("HH:mm")));
+            {
+                if (_cache.ContainsKey(provider) && _lastSuccessAt.TryGetValue(provider, out var lastSuccess))
+                    _widget.ShowStaleData(lastSuccess);
+                else
+                    _widget.ShowNotice(L10n.F("retry_at", DateTime.Now.AddSeconds(waitSec).ToString("HH:mm")));
+            }
         }
         catch (UnauthorizedAccessException ex)
         {
+            _providerStatus[provider] = DiagnosticsService.ClassifyError(ex);
             if (_widget.ActiveProvider == provider) _widget.ShowError(ex.Message);
             _tray.Text = L10n.T("tray_need_login");
         }
         catch (Exception ex)
         {
+            _providerStatus[provider] = DiagnosticsService.ClassifyError(ex);
             Log.Error($"{provider.DisplayName()} 用量更新失敗", ex);
             if (_widget.ActiveProvider == provider)
-                _widget.ShowError(L10n.F("err_update_prefix", ex.Message));
+            {
+                if (_cache.TryGetValue(provider, out var cached) &&
+                    _lastSuccessAt.TryGetValue(provider, out var lastSuccess))
+                {
+                    _widget.ShowUsage(cached, lastSuccess);
+                    _widget.ShowStaleData(lastSuccess);
+                }
+                else
+                {
+                    _widget.ShowError(L10n.F("err_update_prefix", ex.Message));
+                }
+            }
         }
         finally
         {
