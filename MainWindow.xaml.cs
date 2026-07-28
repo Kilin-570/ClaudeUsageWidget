@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     List<UsageBucket> _lastBuckets = new();
     bool _hasError;
     bool _showingUpdateProgress;
+    DateTimeOffset? _lastSuccessfulRefresh;
     UsageProviderKind _activeProvider;
     HwndSource? _windowSource;
 
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
     public event Action? HideRequested;
     public event Action? ExitRequested;
     public event Action? SettingsRequested;
+    public event Action? DiagnosticsRequested;
     public event Action? UpdateCheckRequested;
     public event Action? CancelUpdateRequested;
     public event Action<UsageProviderKind>? ProviderChanged;
@@ -270,6 +272,7 @@ public partial class MainWindow : Window
     void OnReloginClick(object sender, RoutedEventArgs e) => ReloginRequested?.Invoke();
     void OnExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke();
     void OnSettingsClick(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
+    void OnDiagnosticsClick(object sender, RoutedEventArgs e) => DiagnosticsRequested?.Invoke();
     void OnCheckUpdateClick(object sender, RoutedEventArgs e) => UpdateCheckRequested?.Invoke();
     void OnCancelUpdateClick(object sender, RoutedEventArgs e) => CancelUpdateRequested?.Invoke();
     void OnClaudeProviderClick(object sender, RoutedEventArgs e) => SelectProvider(UsageProviderKind.Claude);
@@ -282,6 +285,7 @@ public partial class MainWindow : Window
         _settings.ActiveProvider = provider.StorageKey();
         _settings.Save();
         _lastBuckets = new List<UsageBucket>();
+        _lastSuccessfulRefresh = null;
         _hasError = false;
         RowsPanel.Children.Clear();
         _rows.Clear();
@@ -300,8 +304,18 @@ public partial class MainWindow : Window
 
     void OnAutoStartToggle(object sender, RoutedEventArgs e)
     {
-        if (AutoStartMenuItem.IsChecked) AutoStart.Enable();
-        else AutoStart.Disable();
+        var result = AutoStartMenuItem.IsChecked
+            ? AutoStart.TryEnable()
+            : AutoStart.TryDisable();
+        AutoStartMenuItem.IsChecked = AutoStart.IsEnabled();
+        if (!result.Succeeded || result.Detail is not null)
+        {
+            System.Windows.MessageBox.Show(
+                L10n.F("autostart_problem", result.Detail ?? "UnknownFailure"),
+                L10n.T("widget_title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     public void ShowLoading(string message)
@@ -344,13 +358,25 @@ public partial class MainWindow : Window
         ApplyCollapsedState();
     }
 
-    public void ShowUsage(List<UsageBucket> buckets)
+    public void ShowUsage(List<UsageBucket> buckets, DateTimeOffset? refreshedAt = null)
     {
         _lastBuckets = buckets;
+        _lastSuccessfulRefresh = refreshedAt ?? DateTimeOffset.Now;
         _hasError = false;
-        StatusText.Text = DateTime.Now.ToString("HH:mm");
+        StatusText.Text = _lastSuccessfulRefresh.Value.ToLocalTime().ToString("HH:mm");
         if (IsVisible) UpdateRows();
         else _rowsDirty = true; // hidden (tray-only): defer UI work until shown again
+        ApplyCollapsedState();
+    }
+
+    /// <summary>Keeps the last successful values visible while clearly marking them as stale.</summary>
+    public void ShowStaleData(DateTimeOffset lastSuccessfulRefresh)
+    {
+        _lastSuccessfulRefresh = lastSuccessfulRefresh;
+        _hasError = false;
+        StatusText.Text = L10n.F(
+            "data_stale",
+            lastSuccessfulRefresh.ToLocalTime().ToString("HH:mm"));
         ApplyCollapsedState();
     }
 
@@ -434,6 +460,7 @@ public partial class MainWindow : Window
         RefreshMenuItem.Header = L10n.T("menu_refresh");
         HideMenuItem.Header = L10n.T("menu_hide");
         SettingsMenuItem.Header = L10n.T("menu_settings");
+        DiagnosticsMenuItem.Header = L10n.T("menu_copy_diagnostics");
         AutoStartMenuItem.Header = L10n.T("menu_autostart");
         CheckUpdateMenuItem.Header = L10n.T("menu_check_update");
         ReloginMenuItem.Header = L10n.T("menu_relogin");
