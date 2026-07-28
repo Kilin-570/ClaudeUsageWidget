@@ -36,7 +36,9 @@ The widget deliberately does not request or store an OpenAI API key. The public 
 - ⏰ **Reset countdowns** — updated locally between network refreshes
 - 🎨 **Themes and language** — dark/light and Traditional Chinese/English
 - 🚀 **Start with Windows** — Startup-folder shortcut with delayed launch
-- ⬆️ **Built-in updater** — checks this repository's GitHub Releases
+- 🕘 **Resilient refresh** — keeps the last successful values visible and marks them stale during temporary provider or network failures
+- 🩺 **Redacted diagnostics** — copies version and provider health information without tokens, account data, usage values, logs, or full paths
+- ⬆️ **Built-in updater** — shows progress, verifies SHA-256 before installation, rolls back failed replacement, and safely cleans update temporary files
 - 🔒 **No telemetry** — no analytics, advertising, or third-party relay server
 
 ## Install

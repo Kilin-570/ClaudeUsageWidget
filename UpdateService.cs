@@ -30,6 +30,8 @@ public static class UpdateService
     const string AssetName = "ClaudeUsageWidget-win-x64.zip";
     const string ChecksumAssetName = "SHA256SUMS.txt";
     const int BufferSize = 128 * 1024;
+    const string TemporaryDirectoryPrefix = "ClaudeUsageWidget-update-";
+    static readonly TimeSpan StaleTemporaryDirectoryAge = TimeSpan.FromDays(7);
 
     static readonly HttpClient Http = CreateClient();
 
@@ -97,47 +99,42 @@ public static class UpdateService
         var exe = Environment.ProcessPath
             ?? throw new InvalidOperationException("cannot determine exe path");
 
-        var tmpDir = Path.Combine(Path.GetTempPath(), "ClaudeUsageWidget-update-" + Guid.NewGuid().ToString("N"));
+        var tmpDir = Path.Combine(Path.GetTempPath(), TemporaryDirectoryPrefix + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmpDir);
         var zipPath = Path.Combine(tmpDir, AssetName);
 
-        await DownloadFileAsync(info.ZipUrl, zipPath, progress, cancellationToken);
-
-        // Cancellation is intentionally limited to the download. Once verification starts,
-        // stopping halfway through a file swap would be worse than finishing safely.
-        progress?.Report(new UpdateProgress(UpdateStage.Verifying));
-        var expectedHash = ParseExpectedHash(await Http.GetStringAsync(info.ChecksumUrl), AssetName);
-        var actualHash = await ComputeSha256Async(zipPath, progress);
-        if (!string.Equals(expectedHash, actualHash, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("downloaded update failed SHA-256 verification");
-
-        var extractDir = Path.Combine(tmpDir, "extracted");
-        progress?.Report(new UpdateProgress(UpdateStage.Extracting));
-        ZipFile.ExtractToDirectory(zipPath, extractDir);
-        var executables = Directory.GetFiles(extractDir, "ClaudeUsageWidget.exe", SearchOption.AllDirectories);
-        if (executables.Length != 1)
-            throw new InvalidOperationException("update package did not contain exactly one ClaudeUsageWidget.exe");
-        var newExe = executables[0];
-
-        // A running exe cannot be overwritten, but it CAN be renamed on the same volume.
-        progress?.Report(new UpdateProgress(UpdateStage.Applying));
-        var oldPath = exe + ".old";
-        if (File.Exists(oldPath)) File.Delete(oldPath);
-        File.Move(exe, oldPath);
         try
         {
-            File.Move(newExe, exe);
-        }
-        catch
-        {
-            File.Move(oldPath, exe); // roll back so the app still starts next time
-            throw;
-        }
+            await DownloadFileAsync(info.ZipUrl, zipPath, progress, cancellationToken);
 
-        Log.Write($"已更新 v{Current} -> v{info.Latest}，重新啟動");
-        progress?.Report(new UpdateProgress(UpdateStage.Restarting));
-        System.Diagnostics.Process.Start(
-            new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = true });
+            // Cancellation is intentionally limited to the download. Once verification starts,
+            // stopping halfway through a file swap would be worse than finishing safely.
+            progress?.Report(new UpdateProgress(UpdateStage.Verifying));
+            var expectedHash = ParseExpectedHash(await Http.GetStringAsync(info.ChecksumUrl), AssetName);
+            await VerifySha256Async(zipPath, expectedHash, progress);
+
+            var extractDir = Path.Combine(tmpDir, "extracted");
+            progress?.Report(new UpdateProgress(UpdateStage.Extracting));
+            ZipFile.ExtractToDirectory(zipPath, extractDir);
+            var executables = Directory.GetFiles(extractDir, "ClaudeUsageWidget.exe", SearchOption.AllDirectories);
+            if (executables.Length != 1)
+                throw new InvalidOperationException("update package did not contain exactly one ClaudeUsageWidget.exe");
+
+            // A running exe cannot be overwritten, but it CAN be renamed on the same volume.
+            progress?.Report(new UpdateProgress(UpdateStage.Applying));
+            ReplaceExecutable(exe, executables[0]);
+
+            Log.Write($"已更新 v{Current} -> v{info.Latest}，重新啟動");
+            progress?.Report(new UpdateProgress(UpdateStage.Restarting));
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = true });
+        }
+        finally
+        {
+            // The replacement executable has already moved out of this directory.
+            // Clean up on success, verification failure, cancellation, and extraction failure.
+            TryDeleteTemporaryDirectory(tmpDir);
+        }
     }
 
     static async Task DownloadFileAsync(
@@ -153,6 +150,17 @@ public static class UpdateService
 
         await using var input = await resp.Content.ReadAsStreamAsync(cancellationToken);
         await using var output = File.Create(destination);
+        await CopyDownloadAsync(input, output, total, progress, cancellationToken);
+    }
+
+    internal static async Task CopyDownloadAsync(
+        Stream input,
+        Stream output,
+        long? total,
+        IProgress<UpdateProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
         var completed = 0L;
         var throttle = Stopwatch.StartNew();
@@ -174,6 +182,32 @@ public static class UpdateService
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    internal static async Task VerifySha256Async(
+        string path,
+        string expectedHash,
+        IProgress<UpdateProgress>? progress = null)
+    {
+        var actualHash = await ComputeSha256Async(path, progress);
+        if (!string.Equals(expectedHash, actualHash, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("downloaded update failed SHA-256 verification");
+    }
+
+    internal static void ReplaceExecutable(string currentExe, string replacementExe)
+    {
+        var oldPath = currentExe + ".old";
+        if (File.Exists(oldPath)) File.Delete(oldPath);
+        File.Move(currentExe, oldPath);
+        try
+        {
+            File.Move(replacementExe, currentExe);
+        }
+        catch
+        {
+            File.Move(oldPath, currentExe); // roll back so the app still starts next time
+            throw;
         }
     }
 
@@ -232,5 +266,64 @@ public static class UpdateService
             if (File.Exists(old)) File.Delete(old);
         }
         catch { /* still locked by the exiting old process — next launch will get it */ }
+    }
+
+    /// <summary>Removes abandoned updater directories without touching unrelated temp data.</summary>
+    public static void CleanupStaleTemporaryDirectories() =>
+        CleanupStaleTemporaryDirectories(Path.GetTempPath(), DateTime.UtcNow, StaleTemporaryDirectoryAge);
+
+    internal static void CleanupStaleTemporaryDirectories(
+        string tempRoot,
+        DateTime utcNow,
+        TimeSpan maxAge)
+    {
+        if (!Directory.Exists(tempRoot)) return;
+
+        foreach (var directory in Directory.EnumerateDirectories(
+                     tempRoot, TemporaryDirectoryPrefix + "*", SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                var name = Path.GetFileName(directory);
+                var suffix = name[TemporaryDirectoryPrefix.Length..];
+                if (!Guid.TryParseExact(suffix, "N", out _)) continue;
+                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) continue;
+                if (utcNow - Directory.GetLastWriteTimeUtc(directory) < maxAge) continue;
+                TryDeleteTemporaryDirectory(directory, tempRoot);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not inspect an abandoned update directory", ex);
+            }
+        }
+    }
+
+    internal static bool TryDeleteTemporaryDirectory(string directory, string? expectedTempRoot = null)
+    {
+        try
+        {
+            var root = Path.GetFullPath(expectedTempRoot ?? Path.GetTempPath())
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var full = Path.GetFullPath(directory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var name = Path.GetFileName(full);
+            var suffix = name.StartsWith(TemporaryDirectoryPrefix, StringComparison.Ordinal)
+                ? name[TemporaryDirectoryPrefix.Length..]
+                : "";
+
+            if (!string.Equals(Path.GetDirectoryName(full), root, StringComparison.OrdinalIgnoreCase) ||
+                !Guid.TryParseExact(suffix, "N", out _) ||
+                !Directory.Exists(full) ||
+                (File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0)
+                return false;
+
+            Directory.Delete(full, recursive: true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Could not remove an update temporary directory", ex);
+            return false;
+        }
     }
 }
