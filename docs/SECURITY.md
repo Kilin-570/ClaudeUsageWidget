@@ -46,6 +46,10 @@ GitHub Actions builds the release commit, runs the local mock app-server smoke t
 
 The updater downloads the asset named `ClaudeUsageWidget-win-x64.zip` and its `SHA256SUMS.txt` companion from this repository's latest GitHub Release. It verifies the expected SHA-256 checksum before extracting or replacing the executable, and rejects packages that do not contain exactly one `ClaudeUsageWidget.exe`.
 
+Updater temporary directories are deleted after success, cancellation, or failure. Startup cleanup only removes directories older than seven days whose names match the widget's exact GUID-based pattern, are direct children of the Windows temporary directory, and are not reparse points.
+
+The **Copy diagnostic information** command is intentionally redacted. It reports application/OS versions, provider status categories, last-success timestamps, and the Codex executable name/version, but excludes credentials, account identifiers, usage values, log contents, and full filesystem paths.
+
 The checksum protects against corrupted or mismatched downloads. Releases are not currently code-signed, so users who require stronger supply-chain assurance should build from a reviewed commit and verify the published checksum independently.
 
 ## Reporting a security issue
