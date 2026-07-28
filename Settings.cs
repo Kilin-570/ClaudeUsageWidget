@@ -48,6 +48,8 @@ public class Settings
     }
 }
 
+public sealed record AutoStartResult(bool Succeeded, string? Detail = null);
+
 public static class AutoStart
 {
     // Legacy mechanism (v1 used HKCU Run; on this machine Windows silently ignored the
@@ -58,36 +60,70 @@ public static class AutoStart
     static string ShortcutPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.Startup), "ClaudeUsageWidget.lnk");
 
-    public static bool IsEnabled() => File.Exists(ShortcutPath) || RunKeyExists();
-
-    public static void Enable()
+    public static bool IsEnabled()
     {
-        var exe = Environment.ProcessPath;
-        if (exe is null) return;
+        if (File.Exists(ShortcutPath)) return true;
         try
         {
-            var shellType = Type.GetTypeFromProgID("WScript.Shell")
-                ?? throw new InvalidOperationException("WScript.Shell 不可用");
-            dynamic shell = Activator.CreateInstance(shellType)!;
-            var lnk = shell.CreateShortcut(ShortcutPath);
-            lnk.TargetPath = exe;
-            lnk.Arguments = "--autostart"; // tells the app to delay init until the profile is ready
-            lnk.WorkingDirectory = Path.GetDirectoryName(exe);
-            lnk.Description = "Claude + ChatGPT Usage Widget";
-            lnk.Save();
-            Log.Write($"已建立啟動捷徑: {ShortcutPath} -> {exe}");
+            return RunKeyExists();
         }
         catch (Exception ex)
         {
-            Log.Error("建立啟動捷徑失敗", ex);
+            Log.Error("Could not inspect the auto-start registry entry", ex);
+            return false;
         }
-        RemoveRunKey(); // avoid double-launch via the legacy mechanism
     }
 
-    public static void Disable()
+    public static AutoStartResult TryEnable()
     {
-        try { File.Delete(ShortcutPath); } catch { }
-        RemoveRunKey();
+        var exe = Environment.ProcessPath;
+        if (exe is null) return new AutoStartResult(false, "ProcessPathUnavailable");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(ShortcutPath)!);
+            var shellType = Type.GetTypeFromProgID("WScript.Shell")
+                ?? throw new InvalidOperationException("WScript.Shell is unavailable");
+            dynamic shell = Activator.CreateInstance(shellType)!;
+            var lnk = shell.CreateShortcut(ShortcutPath);
+            lnk.TargetPath = exe;
+            lnk.Arguments = "--autostart";
+            lnk.WorkingDirectory = Path.GetDirectoryName(exe);
+            lnk.Description = "Claude + ChatGPT Usage Widget";
+            lnk.Save();
+            Log.Write($"Created auto-start shortcut: {ShortcutPath} -> {exe}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Could not create the auto-start shortcut", ex);
+            return new AutoStartResult(false, SafeFailureCode(ex));
+        }
+
+        // A policy-blocked registry cleanup is reported but does not invalidate
+        // the shortcut that was successfully created.
+        return TryRemoveRunKey(out var warning)
+            ? new AutoStartResult(true)
+            : new AutoStartResult(true, warning);
+    }
+
+    public static AutoStartResult TryDisable()
+    {
+        string? shortcutFailure = null;
+        try
+        {
+            File.Delete(ShortcutPath);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Could not remove the auto-start shortcut", ex);
+            shortcutFailure = SafeFailureCode(ex);
+        }
+
+        var registryRemoved = TryRemoveRunKey(out var registryFailure);
+        var succeeded = shortcutFailure is null && registryRemoved;
+        var detail = string.Join(
+            ",",
+            new[] { shortcutFailure, registryFailure }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        return new AutoStartResult(succeeded, detail.Length == 0 ? null : detail);
     }
 
     static bool RunKeyExists()
@@ -96,9 +132,23 @@ public static class AutoStart
         return key?.GetValue(ValueName) is string;
     }
 
-    static void RemoveRunKey()
+    static bool TryRemoveRunKey(out string? failure)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
-        key?.DeleteValue(ValueName, throwOnMissingValue: false);
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+            key?.DeleteValue(ValueName, throwOnMissingValue: false);
+            failure = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Could not remove the legacy auto-start registry entry", ex);
+            failure = SafeFailureCode(ex);
+            return false;
+        }
     }
+
+    internal static string SafeFailureCode(Exception ex) =>
+        $"{ex.GetType().Name}:0x{ex.HResult:X8}";
 }
