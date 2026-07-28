@@ -20,6 +20,105 @@ try
 catch (InvalidOperationException) { missingChecksumWasRejected = true; }
 Require(missingChecksumWasRejected, "A missing update checksum should be rejected.");
 
+var updaterTestRoot = Path.Combine(
+    Path.GetTempPath(),
+    "ClaudeUsageWidget.UpdaterTests",
+    Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(updaterTestRoot);
+try
+{
+    var downloadedFile = Path.Combine(updaterTestRoot, "download.zip");
+    await File.WriteAllTextAsync(downloadedFile, "known test content");
+    var hashMismatchWasRejected = false;
+    try
+    {
+        await UpdateService.VerifySha256Async(downloadedFile, new string('0', 64));
+    }
+    catch (InvalidOperationException) { hashMismatchWasRejected = true; }
+    Require(hashMismatchWasRejected, "A downloaded update with the wrong SHA-256 should be rejected.");
+
+    var cancellationWasObserved = false;
+    using (var input = new MemoryStream(new byte[128]))
+    using (var output = new MemoryStream())
+    using (var cancellation = new CancellationTokenSource())
+    {
+        cancellation.Cancel();
+        try
+        {
+            await UpdateService.CopyDownloadAsync(
+                input,
+                output,
+                input.Length,
+                progress: null,
+                cancellation.Token);
+        }
+        catch (OperationCanceledException) { cancellationWasObserved = true; }
+    }
+    Require(cancellationWasObserved, "Cancelling an update download should stop before writing.");
+
+    var currentExe = Path.Combine(updaterTestRoot, "current.exe");
+    File.WriteAllText(currentExe, "original executable");
+    var replacementFailureWasObserved = false;
+    try
+    {
+        UpdateService.ReplaceExecutable(
+            currentExe,
+            Path.Combine(updaterTestRoot, "missing-replacement.exe"));
+    }
+    catch (IOException) { replacementFailureWasObserved = true; }
+    Require(replacementFailureWasObserved, "The replacement failure test should exercise rollback.");
+    Require(File.Exists(currentExe), "The original executable should be restored after replacement failure.");
+    Require(
+        File.ReadAllText(currentExe) == "original executable",
+        "Rollback should preserve the original executable contents.");
+    Require(!File.Exists(currentExe + ".old"), "Rollback should not strand the original as an .old file.");
+
+    var abandonedUpdate = Path.Combine(
+        updaterTestRoot,
+        "ClaudeUsageWidget-update-" + Guid.NewGuid().ToString("N"));
+    var recentUpdate = Path.Combine(
+        updaterTestRoot,
+        "ClaudeUsageWidget-update-" + Guid.NewGuid().ToString("N"));
+    var unrelatedDirectory = Path.Combine(updaterTestRoot, "unrelated-temp-data");
+    Directory.CreateDirectory(abandonedUpdate);
+    Directory.CreateDirectory(recentUpdate);
+    Directory.CreateDirectory(unrelatedDirectory);
+    File.WriteAllText(Path.Combine(abandonedUpdate, "payload.bin"), "old");
+    Directory.SetLastWriteTimeUtc(abandonedUpdate, DateTime.UtcNow.AddDays(-10));
+
+    UpdateService.CleanupStaleTemporaryDirectories(
+        updaterTestRoot,
+        DateTime.UtcNow,
+        TimeSpan.FromDays(7));
+    Require(!Directory.Exists(abandonedUpdate), "Abandoned updater data should be removed.");
+    Require(Directory.Exists(recentUpdate), "Recent updater data should be preserved.");
+    Require(Directory.Exists(unrelatedDirectory), "Unrelated temporary data should never be removed.");
+    Require(
+        !UpdateService.TryDeleteTemporaryDirectory(unrelatedDirectory, updaterTestRoot),
+        "The updater cleanup guard should reject unrelated directory names.");
+}
+finally
+{
+    if (Directory.Exists(updaterTestRoot)) Directory.Delete(updaterTestRoot, recursive: true);
+}
+
+var privateError = new IOException(@"secret-token at C:\Users\Alice\private");
+var diagnosticReport = DiagnosticsService.BuildReport(
+    new Version(2, 0, 4),
+    UsageProviderKind.ChatGpt,
+    new[]
+    {
+        new ProviderDiagnostic(
+            UsageProviderKind.Claude,
+            DateTimeOffset.Parse("2030-01-01T00:00:00Z"),
+            DiagnosticsService.ClassifyError(privateError)),
+        new ProviderDiagnostic(UsageProviderKind.ChatGpt, null, "NotChecked"),
+    },
+    new CodexDiagnostic("Configured", "codex.exe", "1.2.3"));
+Require(!diagnosticReport.Contains("secret-token"), "Diagnostics should not include exception messages.");
+Require(!diagnosticReport.Contains(@"C:\Users\Alice"), "Diagnostics should not include full user paths.");
+Require(!AutoStart.SafeFailureCode(privateError).Contains("secret-token"), "Auto-start failure codes should be redacted.");
+
 var primaryScreen = new System.Windows.Rect(0, 0, 1920, 1080);
 var strandedOnDisconnectedDisplay = new System.Windows.Rect(2200, 100, 320, 240);
 Require(
@@ -100,4 +199,4 @@ Require(chatGpt[0].Utilization == 25.0, "Primary ChatGPT utilization is incorrec
 Require(chatGpt[1].Label == "Weekly limit", "Secondary ChatGPT window label is incorrect.");
 Require(chatGpt[1].Utilization == 40.0, "Secondary ChatGPT utilization is incorrect.");
 
-Console.WriteLine("Smoke tests passed: window placement recovery, Claude parser, ChatGPT desktop Codex discovery, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
+Console.WriteLine("Smoke tests passed: safe updater failure handling and cleanup, redacted diagnostics, window placement recovery, Claude parser, ChatGPT desktop Codex discovery, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
