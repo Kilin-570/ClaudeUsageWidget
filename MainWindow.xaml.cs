@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Color = System.Windows.Media.Color;
 using Cursor = System.Windows.Input.Cursor;
@@ -24,8 +25,11 @@ public partial class MainWindow : Window
     DateTimeOffset? _lastSuccessfulRefresh;
     UsageProviderKind _activeProvider;
     HwndSource? _windowSource;
+    int _providerBackdropAnimationGeneration;
 
     const int WmDisplayChange = 0x007E;
+    static readonly Duration ProviderBackdropFadeDuration =
+        new(TimeSpan.FromMilliseconds(180));
 
     public event Action? RefreshRequested;
     public event Action? ReloginRequested;
@@ -291,6 +295,7 @@ public partial class MainWindow : Window
         _rows.Clear();
         StatusText.Text = L10n.T("updating");
         ApplyProviderButtons();
+        ApplyProviderBackdrop(animate: true);
         ApplyCollapsedState();
         ProviderChanged?.Invoke(provider);
     }
@@ -300,6 +305,7 @@ public partial class MainWindow : Window
         _activeProvider = provider;
         _settings.ActiveProvider = provider.StorageKey();
         ApplyProviderButtons();
+        ApplyProviderBackdrop(animate: IsLoaded);
     }
 
     void OnAutoStartToggle(object sender, RoutedEventArgs e)
@@ -410,6 +416,9 @@ public partial class MainWindow : Window
         UpdateProgressPanel.Visibility = _showingUpdateProgress
             ? Visibility.Visible
             : Visibility.Collapsed;
+        ProviderBackdropHost.Visibility = collapsed
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         if (collapsed) RebuildCompact();
     }
 
@@ -444,12 +453,25 @@ public partial class MainWindow : Window
     /// <summary>Applies theme colors, background transparency and UI language.</summary>
     public void ApplyAppearance()
     {
-        var bg = ThemeManager.WindowBg;
         // Alpha floor of 2 keeps the window hit-testable (fully transparent pixels
         // would become click-through and the widget could no longer be dragged).
         var alpha = (byte)Math.Clamp(
             (int)Math.Round(255 * (100 - _settings.BgTransparency) / 100.0), 2, 255);
-        RootBorder.Background = new SolidColorBrush(Color.FromArgb(alpha, bg.R, bg.G, bg.B));
+        var surface = ThemeManager.IsLight
+            ? Color.FromRgb(0xF3, 0xF3, 0xF7)
+            : Color.FromRgb(0x1B, 0x1B, 0x24);
+        RootBorder.Background = new SolidColorBrush(
+            Color.FromArgb(alpha, surface.R, surface.G, surface.B));
+        RootBorder.BorderBrush = ThemeManager.IsLight
+            ? ThemeManager.Brush(Color.FromRgb(0xB8, 0xB9, 0xC3))
+            : ThemeManager.Brush(Color.FromRgb(0x5A, 0x5B, 0x67));
+        InnerHighlightBorder.BorderBrush = ThemeManager.IsLight
+            ? ThemeManager.Brush(Color.FromArgb(0xB8, 0xFF, 0xFF, 0xFF))
+            : ThemeManager.Brush(Color.FromArgb(0x32, 0xFF, 0xFF, 0xFF));
+        RootShadow.Color = ThemeManager.IsLight
+            ? Color.FromRgb(0x42, 0x45, 0x52)
+            : Colors.Black;
+        RootShadow.Opacity = ThemeManager.IsLight ? 0.24 : 0.44;
 
         TitleText.Text = L10n.T("widget_title");
         TitleText.Foreground = ThemeManager.Brush(ThemeManager.TitleText);
@@ -470,6 +492,7 @@ public partial class MainWindow : Window
         ClaudeProviderButton.Content = L10n.T("provider_claude");
         ChatGptProviderButton.Content = L10n.T("provider_chatgpt");
         ApplyProviderButtons();
+        ApplyProviderBackdrop(animate: false);
 
         RebuildRows();
         ApplyCollapsedState();
@@ -478,15 +501,15 @@ public partial class MainWindow : Window
     void ApplyProviderButtons()
     {
         if (ClaudeProviderButton is null || ChatGptProviderButton is null) return;
-        var selectedBg = ThemeManager.IsLight
-            ? ThemeManager.Brush(Color.FromRgb(0xDE, 0xE9, 0xF8))
-            : ThemeManager.Brush(Color.FromRgb(0x2C, 0x3A, 0x52));
         var idleBg = ThemeManager.IsLight
-            ? ThemeManager.Brush(Color.FromRgb(0xF1, 0xF1, 0xF5))
-            : ThemeManager.Brush(Color.FromRgb(0x24, 0x24, 0x30));
-        var border = ThemeManager.IsLight
-            ? ThemeManager.Brush(Color.FromRgb(0xC9, 0xC9, 0xD2))
-            : ThemeManager.Brush(Color.FromRgb(0x43, 0x43, 0x50));
+            ? ThemeManager.Brush(Color.FromRgb(0xEC, 0xEC, 0xF1))
+            : ThemeManager.Brush(Color.FromRgb(0x27, 0x27, 0x32));
+        var claudeSelectedBg = ThemeManager.IsLight
+            ? ThemeManager.Brush(Color.FromRgb(0xF5, 0xDF, 0xD6))
+            : ThemeManager.Brush(Color.FromRgb(0x49, 0x2F, 0x29));
+        var chatGptSelectedBg = ThemeManager.IsLight
+            ? ThemeManager.Brush(Color.FromRgb(0xD8, 0xEF, 0xEA))
+            : ThemeManager.Brush(Color.FromRgb(0x1F, 0x42, 0x3C));
 
         foreach (var (button, provider) in new[]
                  {
@@ -495,13 +518,90 @@ public partial class MainWindow : Window
                  })
         {
             var selected = provider == _activeProvider;
-            button.Background = selected ? selectedBg : idleBg;
-            button.BorderBrush = border;
+            button.Background = selected
+                ? provider == UsageProviderKind.Claude
+                    ? claudeSelectedBg
+                    : chatGptSelectedBg
+                : idleBg;
             button.Foreground = selected
                 ? ThemeManager.Brush(ThemeManager.TitleText)
                 : ThemeManager.Brush(ThemeManager.LabelText);
             button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
         }
+    }
+
+    void ApplyProviderBackdrop(bool animate)
+    {
+        if (ClaudeBackdrop is null || ChatGptBackdrop is null) return;
+
+        var claudeAccent = ThemeManager.IsLight
+            ? Color.FromRgb(0x9E, 0x42, 0x27)
+            : Color.FromRgb(0xF0, 0x8A, 0x68);
+        var chatGptAccent = ThemeManager.IsLight
+            ? Color.FromRgb(0x0A, 0x70, 0x60)
+            : Color.FromRgb(0x48, 0xD6, 0xBE);
+
+        ClaudeWatermark.Foreground = ThemeManager.Brush(claudeAccent);
+        ChatGptWatermark.Foreground = ThemeManager.Brush(chatGptAccent);
+        ClaudeWatermark.Opacity = ThemeManager.IsLight ? 0.14 : 0.095;
+        ChatGptWatermark.Opacity = ThemeManager.IsLight ? 0.14 : 0.095;
+
+        var providerAccent = _activeProvider == UsageProviderKind.Claude
+            ? claudeAccent
+            : chatGptAccent;
+        ProviderAccentBar.Background = ThemeManager.Brush(providerAccent);
+        ProviderAccentBar.Opacity = ThemeManager.IsLight ? 0.72 : 0.82;
+
+        var claudeOpacity = _activeProvider == UsageProviderKind.Claude
+            ? 1
+            : 0;
+        var chatGptOpacity = _activeProvider == UsageProviderKind.ChatGpt
+            ? 1
+            : 0;
+        var shouldAnimate = animate
+                            && IsVisible
+                            && SystemParameters.ClientAreaAnimation;
+
+        var generation = ++_providerBackdropAnimationGeneration;
+        SetBackdropOpacity(ClaudeBackdrop, claudeOpacity, shouldAnimate, generation);
+        SetBackdropOpacity(ChatGptBackdrop, chatGptOpacity, shouldAnimate, generation);
+    }
+
+    void SetBackdropOpacity(
+        UIElement backdrop,
+        double targetOpacity,
+        bool animate,
+        int generation)
+    {
+        var currentOpacity = backdrop.Opacity;
+        backdrop.BeginAnimation(OpacityProperty, null);
+        if (!animate)
+        {
+            backdrop.Opacity = targetOpacity;
+            return;
+        }
+
+        var animation = new DoubleAnimation
+        {
+            From = currentOpacity,
+            To = targetOpacity,
+            Duration = ProviderBackdropFadeDuration,
+            EasingFunction = new QuadraticEase
+            {
+                EasingMode = EasingMode.EaseOut,
+            },
+            FillBehavior = FillBehavior.Stop,
+        };
+        animation.Completed += (_, _) =>
+        {
+            if (generation != _providerBackdropAnimationGeneration) return;
+            backdrop.BeginAnimation(OpacityProperty, null);
+            backdrop.Opacity = targetOpacity;
+        };
+        backdrop.BeginAnimation(
+            OpacityProperty,
+            animation,
+            HandoffBehavior.SnapshotAndReplace);
     }
 
     // Rows are created once and updated in place on each refresh — rebuilding the whole
@@ -579,8 +679,8 @@ public partial class MainWindow : Window
         };
         var pct = new TextBlock
         {
-            FontSize = 12,
-            FontWeight = FontWeights.Bold,
+            FontSize = 13.5,
+            FontWeight = FontWeights.SemiBold,
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         var header = new DockPanel();

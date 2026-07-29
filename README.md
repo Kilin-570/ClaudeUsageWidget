@@ -4,9 +4,27 @@ A small, open-source Windows desktop widget for checking **Claude plan usage** a
 
 一個小巧的 Windows 桌面用量工具，可在同一個小工具中切換查看 **Claude 方案用量**與 **ChatGPT 帳號下的 Codex 額度**。
 
-| ChatGPT usage | Claude usage |
+## Screenshots / 畫面預覽
+
+### Dark theme / 深色主題
+
+| ChatGPT（繁體中文） | ChatGPT (English) |
 | :---: | :---: |
-| ![ChatGPT usage](docs/ChatGPT.png) | ![Claude usage](docs/Claude.png) |
+| ![ChatGPT usage in dark theme and Traditional Chinese](docs/ChatGPT.png) | ![ChatGPT usage in dark theme and English](docs/ChatGPT-Dark-English.png) |
+
+| Claude（繁體中文） | Claude (English) |
+| :---: | :---: |
+| ![Claude usage in dark theme and Traditional Chinese](docs/Claude.png) | ![Claude usage in dark theme and English](docs/Claude-Dark-English.png) |
+
+### Light theme / 淺色主題
+
+| ChatGPT（繁體中文） | ChatGPT (English) |
+| :---: | :---: |
+| ![ChatGPT usage in light theme and Traditional Chinese](docs/ChatGPT-Light-ZhHant.png) | ![ChatGPT usage in light theme and English](docs/ChatGPT-Light-English.png) |
+
+| Claude（繁體中文） | Claude (English) |
+| :---: | :---: |
+| ![Claude usage in light theme and Traditional Chinese](docs/Claude-Light-ZhHant.png) | ![Claude usage in light theme and English](docs/Claude-Light-English.png) |
 
 ## What it shows
 
@@ -14,21 +32,23 @@ A small, open-source Windows desktop widget for checking **Claude plan usage** a
 
 - Current session usage
 - Weekly overall usage
-- Weekly model-scoped rows returned by Claude
 - Reset countdown for each quota window
 
 ### ChatGPT / Codex
 
-- Primary quota window, normally the 5-hour limit
-- Secondary quota window, normally the weekly limit
+- Available quota windows returned for the signed-in ChatGPT/Codex account
+- Weekly quota when OpenAI provides it
 - Reset countdown for each window
 - Data obtained through OpenAI's official [`codex app-server` local interface](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md#auth-endpoints). This interface may evolve with Codex.
+
+Quota windows can vary by account, plan, and OpenAI service changes. The widget displays the windows currently returned by Codex instead of assuming a fixed five-hour limit.
 
 The widget deliberately does not request or store an OpenAI API key. The public [OpenAI Usage API](https://platform.openai.com/docs/api-reference/usage) reports API organization activity and requires an organization admin key; that is not the same as a personal ChatGPT/Codex allowance.
 
 ## Features
 
 - 🔀 **Two providers, one widget** — switch between Claude and ChatGPT from the widget or tray menu
+- 🎨 **Provider-aware backdrop** — clear provider-name watermark and color accents change with Claude or ChatGPT without using third-party logos
 - 🪟 **Floating and always on top** — draggable, resizable, and remembers its position
 - 📐 **Compact mode** — collapse the widget to a one-line percentage summary
 - 🔔 **Tray icon** — live percentage ring for the active provider
