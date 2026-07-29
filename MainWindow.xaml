@@ -9,15 +9,15 @@
         MouseLeftButtonUp="OnMouseUpWindow" MouseLeave="OnMouseLeaveWindow">
     <Window.Resources>
         <Style x:Key="ProviderButtonStyle" TargetType="Button">
-            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Padding" Value="8,5"/>
             <Setter Property="FontSize" Value="10.5"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome" CornerRadius="4"
+                        <Border x:Name="Chrome" CornerRadius="7"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
@@ -55,11 +55,42 @@
         </ContextMenu>
     </Window.ContextMenu>
 
-    <Border x:Name="RootBorder" CornerRadius="10" Background="#E6191922" Padding="12,10" MinWidth="215">
+    <Border x:Name="RootBorder" CornerRadius="15" Background="#E6191922"
+            BorderThickness="1" ClipToBounds="True" MinWidth="215">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.5"/>
+            <DropShadowEffect x:Name="RootShadow" BlurRadius="18"
+                              ShadowDepth="3" Direction="270" Opacity="0.42"/>
         </Border.Effect>
-        <StackPanel>
+        <Grid>
+            <!--
+              Plain Segoe UI provider names and original color accents are used instead
+              of third-party logos or official wordmarks. The layer is cached and never
+              receives pointer input.
+            -->
+            <Grid x:Name="ProviderBackdropHost" IsHitTestVisible="False"
+                  ClipToBounds="True" CacheMode="BitmapCache">
+                <Grid x:Name="ClaudeBackdrop" Opacity="0">
+                    <TextBlock x:Name="ClaudeWatermark" Text="CLAUDE"
+                               HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                               Margin="0,0,-3,-8"
+                               FontFamily="Segoe UI" FontSize="34" FontWeight="Bold"
+                               Foreground="#FFD97757" Focusable="False"
+                               AutomationProperties.Name=" "/>
+                </Grid>
+                <Grid x:Name="ChatGptBackdrop" Opacity="0">
+                    <TextBlock x:Name="ChatGptWatermark" Text="CHATGPT"
+                               HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                               Margin="0,0,-3,-8"
+                               FontFamily="Segoe UI" FontSize="31" FontWeight="Bold"
+                               Foreground="#FF31BFA5" Focusable="False"
+                               AutomationProperties.Name=" "/>
+                </Grid>
+            </Grid>
+            <Border x:Name="ProviderAccentBar" Height="2"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Top"
+                    Margin="14,0" CornerRadius="1" IsHitTestVisible="False"/>
+
+            <StackPanel Margin="12,10">
             <DockPanel x:Name="TitleRow" Margin="0,0,0,6">
                 <TextBlock x:Name="ToggleGlyph" DockPanel.Dock="Right" Text="▾" Foreground="#FF8A8A96"
                            FontSize="11" Margin="8,0,0,0" Padding="2,0" VerticalAlignment="Center"
@@ -97,6 +128,12 @@
             <StackPanel x:Name="RowsPanel"/>
             <TextBlock x:Name="ErrorText" Foreground="#FFFF9E80" FontSize="11"
                        TextWrapping="Wrap" MaxWidth="220" Visibility="Collapsed" Margin="0,4,0,0"/>
-        </StackPanel>
+            </StackPanel>
+
+            <!-- Hairline inner highlight keeps the translucent surface legible on any wallpaper. -->
+            <Border x:Name="InnerHighlightBorder" Margin="1"
+                    CornerRadius="13.5" BorderThickness="1"
+                    IsHitTestVisible="False"/>
+        </Grid>
     </Border>
 </Window>
