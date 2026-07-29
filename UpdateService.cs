@@ -26,7 +26,7 @@ public record UpdateProgress(UpdateStage Stage, long CompletedBytes = 0, long? T
 public static class UpdateService
 {
     const string Owner = "Kilin-570";
-    const string Repo = "ClaudeUsageWidget";
+    const string Repo = "AIUsageWidget";
     const string AssetName = "ClaudeUsageWidget-win-x64.zip";
     const string ChecksumAssetName = "SHA256SUMS.txt";
     const int BufferSize = 128 * 1024;

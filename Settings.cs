@@ -88,7 +88,7 @@ public static class AutoStart
             lnk.TargetPath = exe;
             lnk.Arguments = "--autostart";
             lnk.WorkingDirectory = Path.GetDirectoryName(exe);
-            lnk.Description = "Claude + ChatGPT Usage Widget";
+            lnk.Description = "AI Usage Widget";
             lnk.Save();
             Log.Write($"Created auto-start shortcut: {ShortcutPath} -> {exe}");
         }

@@ -1,6 +1,12 @@
-# Claude + ChatGPT Usage Widget
+# AI Usage Widget
 
 A small, open-source Windows desktop widget for checking **Claude plan usage** and **ChatGPT/Codex quota windows** in one place. Switch providers from the widget or tray menu without opening two usage pages.
+
+> Compatibility note: the public project and repository are named **AI Usage
+> Widget** and `AIUsageWidget`. Existing executable, release archive, app-data
+> directory, Startup shortcut, and internal namespace names remain
+> `ClaudeUsageWidget` so current installations can update in place without
+> losing settings or sign-in state.
 
 一個小巧的 Windows 桌面用量工具，可在同一個小工具中切換查看 **Claude 方案用量**與 **ChatGPT 帳號下的 Codex 額度**。
 
@@ -91,8 +97,8 @@ The widget communicates with a local Codex child process over redirected stdin/s
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```powershell
-git clone https://github.com/Kilin-570/ClaudeUsageWidget.git
-cd ClaudeUsageWidget
+git clone https://github.com/Kilin-570/AIUsageWidget.git
+cd AIUsageWidget
 dotnet build ClaudeUsageWidget.csproj -c Release
 dotnet publish ClaudeUsageWidget.csproj -c Release -r win-x64 --self-contained `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist

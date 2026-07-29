@@ -4,6 +4,10 @@ Last updated: 2026-07-29
 
 Current release: `v2.1.0`
 
+Public project name: `AI Usage Widget`
+
+Repository: `Kilin-570/AIUsageWidget`
+
 Default branch: `main`
 
 Last verified release commit: `6ed761142761310a736736f52803dedc218aa9c4`
@@ -31,6 +35,8 @@ paths, logs, and real usage values.
   diagnostics, and clearer auto-start failure handling.
 - Published `v2.1.0` with eight README screenshots covering both providers,
   both themes, and both supported languages.
+- Renamed the public project and repository to provider-neutral
+  `AI Usage Widget` / `AIUsageWidget` under Issue #10.
 
 ## Current provider behavior
 
@@ -61,6 +67,9 @@ paths, logs, and real usage values.
   logs, and full private paths.
 - Release downloads must be verified against `SHA256SUMS.txt` before
   installation.
+- Legacy technical identifiers such as `ClaudeUsageWidget.exe`, the release
+  archive, app-data directory, Startup shortcut, mutex, and C# namespace remain
+  unchanged so existing installations keep their settings and update path.
 
 ## Validation
 
@@ -72,6 +81,9 @@ paths, logs, and real usage values.
   - `SHA256SUMS.txt`
 - README examples and screenshots were reviewed for provider accuracy and
   private information.
+- The provider-neutral repository rename passed a Release build with zero
+  warnings and errors, the full local smoke-test suite, `git diff --check`, and
+  a privacy scan before commit.
 
 ## Next steps
 
