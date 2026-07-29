@@ -72,7 +72,7 @@ public sealed class CodexAppServerClient(Func<string?> configuredPath) : IDispos
                 clientInfo = new
                 {
                     name = "ai_usage_widget",
-                    title = "Claude + ChatGPT Usage Widget",
+                    title = "AI Usage Widget",
                     version = UpdateService.Current.ToString(),
                 },
                 capabilities = new
