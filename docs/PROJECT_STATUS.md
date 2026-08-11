@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-11
 
-Current release: `v2.1.0`
+Current release: `v2.1.1`
 
 Public project name: `AI Usage Widget`
 
@@ -10,9 +10,9 @@ Repository: `Kilin-570/AIUsageWidget`
 
 Default branch: `main`
 
-Last verified release commit: `6ed761142761310a736736f52803dedc218aa9c4`
+Release tag: `v2.1.1`
 
-Status: `v2.1.0` released and verified; Issue #12 fix implemented locally
+Status: Released and verified
 
 This file is the public handoff point for continuing development on another
 computer. It intentionally excludes credentials, account details, local file
@@ -37,6 +37,9 @@ paths, logs, and real usage values.
   both themes, and both supported languages.
 - Renamed the public project and repository to provider-neutral
   `AI Usage Widget` / `AIUsageWidget` under Issue #10.
+- Replaced raw Claude OAuth `invalid_grant` responses with localized guidance
+  that explains how to sign in again, while removing only the unusable Claude
+  credential.
 
 ## Current provider behavior
 
@@ -84,13 +87,13 @@ paths, logs, and real usage values.
 - The provider-neutral repository rename passed a Release build with zero
   warnings and errors, the full local smoke-test suite, `git diff --check`, and
   a privacy scan before commit.
+- The `v2.1.1` Claude re-login fix passed a Release build with zero warnings and
+  errors, OAuth response-redaction coverage, the full local smoke-test suite,
+  `git diff --check`, and a privacy scan before release.
 
 ## Next steps
 
-- Issue #12 adds a localized re-login hint when Anthropic rejects an expired or
-  revoked Claude refresh token, without exposing the raw OAuth response.
-- Open a pull request for the validated Issue #12 branch, then merge it after
-  GitHub Actions passes.
+- No implementation work is currently in progress.
 - Before starting a feature, create or select a GitHub Issue and work on a
   dedicated branch.
 - Re-check provider payloads and update examples if Claude or ChatGPT changes
