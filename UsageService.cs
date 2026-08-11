@@ -91,9 +91,16 @@ public class UsageService
             // of demanding a re-login.
             throw new InvalidOperationException(L10n.F("err_network", ex.Message), ex);
         }
+        catch (OAuthTokenRequestException ex) when (ex.IsInvalidGrant)
+        {
+            // The refresh token is expired, revoked, or already replaced. It cannot recover,
+            // so remove only the Claude credential and give the user an actionable next step.
+            ClearTokens();
+            throw new UnauthorizedAccessException(L10n.T("err_token_expired"), ex);
+        }
         catch (Exception ex) when (ex is not UnauthorizedAccessException)
         {
-            throw new UnauthorizedAccessException(L10n.F("err_refresh_failed", ex.Message));
+            throw new UnauthorizedAccessException(L10n.F("err_refresh_failed", ex.Message), ex);
         }
     }
 }

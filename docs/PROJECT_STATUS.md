@@ -1,8 +1,8 @@
 # Project Status
 
-Last updated: 2026-07-29
+Last updated: 2026-08-11
 
-Current release: `v2.1.0`
+Current release: `v2.1.1`
 
 Public project name: `AI Usage Widget`
 
@@ -10,7 +10,7 @@ Repository: `Kilin-570/AIUsageWidget`
 
 Default branch: `main`
 
-Last verified release commit: `6ed761142761310a736736f52803dedc218aa9c4`
+Release tag: `v2.1.1`
 
 Status: Released and verified
 
@@ -37,6 +37,9 @@ paths, logs, and real usage values.
   both themes, and both supported languages.
 - Renamed the public project and repository to provider-neutral
   `AI Usage Widget` / `AIUsageWidget` under Issue #10.
+- Replaced raw Claude OAuth `invalid_grant` responses with localized guidance
+  that explains how to sign in again, while removing only the unusable Claude
+  credential.
 
 ## Current provider behavior
 
@@ -84,6 +87,9 @@ paths, logs, and real usage values.
 - The provider-neutral repository rename passed a Release build with zero
   warnings and errors, the full local smoke-test suite, `git diff --check`, and
   a privacy scan before commit.
+- The `v2.1.1` Claude re-login fix passed a Release build with zero warnings and
+  errors, OAuth response-redaction coverage, the full local smoke-test suite,
+  `git diff --check`, and a privacy scan before release.
 
 ## Next steps
 

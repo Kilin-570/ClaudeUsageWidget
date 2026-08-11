@@ -7,6 +7,31 @@ static void Require(bool condition, string message)
 
 L10n.Init(UiLanguage.En);
 
+const string expiredRefreshTokenResponse = """
+{
+  "error": "invalid_grant",
+  "error_description": "Refresh token expired"
+}
+""";
+var expiredRefreshTokenError = OAuthTokenRequestException.FromResponse(
+    System.Net.HttpStatusCode.BadRequest,
+    expiredRefreshTokenResponse);
+Require(expiredRefreshTokenError.IsInvalidGrant, "An expired OAuth refresh token should require sign-in again.");
+Require(
+    !expiredRefreshTokenError.Message.Contains("Refresh token expired") &&
+    !expiredRefreshTokenError.Message.Contains("error_description"),
+    "OAuth token endpoint response details should not be exposed in exception messages.");
+Require(
+    L10n.T("err_token_expired").Contains("Connect / sign in again") &&
+    L10n.T("err_token_expired").Contains("tray icon"),
+    "The expired Claude sign-in message should tell users where to sign in again.");
+L10n.Init(UiLanguage.ZhHant);
+Require(
+    L10n.T("err_token_expired").Contains("連結 / 重新登入") &&
+    L10n.T("err_token_expired").Contains("系統匣圖示"),
+    "The Traditional Chinese expired Claude sign-in message should include re-login steps.");
+L10n.Init(UiLanguage.En);
+
 const string updateZip = "ClaudeUsageWidget-win-x64.zip";
 const string expectedUpdateHash = "e68928a80d0cf0ba34c93c249794587ac833617bcdbbe2034bd61db23262e0e9";
 Require(
@@ -199,4 +224,4 @@ Require(chatGpt[0].Utilization == 25.0, "Primary ChatGPT utilization is incorrec
 Require(chatGpt[1].Label == "Weekly limit", "Secondary ChatGPT window label is incorrect.");
 Require(chatGpt[1].Utilization == 40.0, "Secondary ChatGPT utilization is incorrect.");
 
-Console.WriteLine("Smoke tests passed: safe updater failure handling and cleanup, redacted diagnostics, window placement recovery, Claude parser, ChatGPT desktop Codex discovery, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
+Console.WriteLine("Smoke tests passed: sanitized OAuth expiry guidance, safe updater failure handling and cleanup, redacted diagnostics, window placement recovery, Claude parser, ChatGPT desktop Codex discovery, Codex JSON-RPC handshake, ChatGPT rate-limit parser.");
