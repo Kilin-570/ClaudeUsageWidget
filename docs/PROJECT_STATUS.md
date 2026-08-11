@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-07-29
+Last updated: 2026-08-11
 
 Current release: `v2.1.0`
 
@@ -12,7 +12,7 @@ Default branch: `main`
 
 Last verified release commit: `6ed761142761310a736736f52803dedc218aa9c4`
 
-Status: Released and verified
+Status: `v2.1.0` released and verified; Issue #12 fix implemented locally
 
 This file is the public handoff point for continuing development on another
 computer. It intentionally excludes credentials, account details, local file
@@ -87,7 +87,10 @@ paths, logs, and real usage values.
 
 ## Next steps
 
-- No implementation work is currently in progress.
+- Issue #12 adds a localized re-login hint when Anthropic rejects an expired or
+  revoked Claude refresh token, without exposing the raw OAuth response.
+- Open a pull request for the validated Issue #12 branch, then merge it after
+  GitHub Actions passes.
 - Before starting a feature, create or select a GitHub Issue and work on a
   dedicated branch.
 - Re-check provider payloads and update examples if Claude or ChatGPT changes

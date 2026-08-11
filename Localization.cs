@@ -54,7 +54,9 @@ public static class L10n
         ["err_not_signed_in_hint"] = ("尚未登入，右鍵選「連結 / 重新登入」。", "Not signed in — right-click and choose \"Connect / sign in again\"."),
         ["tray_need_login"] = ("AI Usage — 需要登入", "AI Usage — sign-in required"),
         ["err_not_signed_in"] = ("尚未登入", "Not signed in"),
-        ["err_token_expired"] = ("Token 已過期,請重新登入", "Session expired — please sign in again"),
+        ["err_token_expired"] = (
+            "Claude 登入已過期。請在小工具或系統匣圖示上按右鍵，選擇「連結 / 重新登入」，再依畫面完成登入。",
+            "Claude sign-in has expired. Right-click the widget or tray icon, choose \"Connect / sign in again\", and complete the sign-in steps."),
         ["err_refresh_failed"] = ("Token 刷新失敗,請重新登入({0})", "Token refresh failed — please sign in again ({0})"),
         ["err_network"] = ("網路暫時無法連線({0})", "Network temporarily unavailable ({0})"),
         ["err_schema_changed"] = ("無法解析用量資料,API 格式可能已變更。請「檢查更新」,若已是最新版請到 GitHub 回報。", "Couldn't parse usage data — the API format may have changed. Try \"Check for updates\", or report it on GitHub if you're up to date."),

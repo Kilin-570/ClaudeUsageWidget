@@ -13,6 +13,49 @@ public class RateLimitedException(TimeSpan? retryAfter) : Exception("usage API �
     public TimeSpan? RetryAfter { get; } = retryAfter;
 }
 
+/// <summary>A sanitized OAuth token-endpoint failure safe to surface in logs or UI.</summary>
+public sealed class OAuthTokenRequestException : Exception
+{
+    public HttpStatusCode StatusCode { get; }
+    public string? ErrorCode { get; }
+    public bool IsInvalidGrant =>
+        string.Equals(ErrorCode, "invalid_grant", StringComparison.OrdinalIgnoreCase);
+
+    OAuthTokenRequestException(HttpStatusCode statusCode, string? errorCode)
+        : base(errorCode is null
+            ? $"OAuth token request failed ({(int)statusCode})."
+            : $"OAuth token request failed ({(int)statusCode}: {errorCode}).")
+    {
+        StatusCode = statusCode;
+        ErrorCode = errorCode;
+    }
+
+    internal static OAuthTokenRequestException FromResponse(HttpStatusCode statusCode, string body)
+    {
+        string? errorCode = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String)
+            {
+                var candidate = error.GetString();
+                if (!string.IsNullOrWhiteSpace(candidate) && candidate.All(IsSafeErrorCodeCharacter))
+                    errorCode = candidate;
+            }
+        }
+        catch (JsonException)
+        {
+            // Provider error bodies are untrusted. Do not copy them into the exception message.
+        }
+
+        return new OAuthTokenRequestException(statusCode, errorCode);
+    }
+
+    static bool IsSafeErrorCodeCharacter(char value) =>
+        char.IsAsciiLetterOrDigit(value) || value is '_' or '-' or '.';
+}
+
 /// <summary>
 /// OAuth PKCE client against Anthropic's Claude-account OAuth (the same flow Claude Code's
 /// /login uses), plus the usage endpoint that backs the /usage screen.
@@ -174,7 +217,7 @@ public class AnthropicOAuth
             new StringContent(jsonPayload, Encoding.UTF8, "application/json"));
         var body = await resp.Content.ReadAsStringAsync();
         if (!resp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Token 請求失敗 ({(int)resp.StatusCode}): {Truncate(body)}");
+            throw OAuthTokenRequestException.FromResponse(resp.StatusCode, body);
 
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
